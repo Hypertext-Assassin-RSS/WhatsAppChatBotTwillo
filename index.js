@@ -141,7 +141,18 @@ app.post("/whatsapp-webhook", async (req, res) => {
                     };
                     try {
                         await syncUserToMoodle(newUser);
-                        responseMessage = "Registration successful! You can now log in to Samanala eSchool using your WhatsApp number as username and password.";
+                        responseMessage = `Registration successful! You can now log in to Samanala eSchool using your WhatsApp number as your username and password. Download the app here: https://play.google.com/store/apps/details?id=com.samanala.eschool.`;
+                        
+                        // Send an image
+                        await client.messages.create({
+                            body: responseMessage,
+                            from: process.env.TWILIO_WHATSAPP_NUMBER,
+                            to: from,
+                            mediaUrl: ['https://drive.google.com/file/d/10eAlMu9W3hZ7F1PSXFE6T1UUpnYAZIYD/view?usp=sharing'] // Replace with your actual image URL
+                        });
+
+                        // Stop further processing after sending the message with the image
+                        return res.status(200).end();
                     } catch (error) {
                         responseMessage = "An error occurred during registration. Please try again.";
                     }
@@ -170,6 +181,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
     console.log(`User: ${from}, Message: ${incomingMsg}, Step: ${session.step}`);
     res.status(200).end();
 });
+
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
