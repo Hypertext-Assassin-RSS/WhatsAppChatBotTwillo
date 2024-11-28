@@ -3,7 +3,7 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'whatsapp-edu-bot'
+app = 'whatsapp-edu-bot-quiet-grass-5298'
 primary_region = 'sin'
 
 [build]

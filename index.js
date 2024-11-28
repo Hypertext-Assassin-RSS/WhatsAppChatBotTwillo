@@ -99,22 +99,26 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     const session = getUserSession(from);
     let responseMessage;
+    let responseMedia;
 
     switch (session.step) {
         case "greeting":
             responseMessage = "Welcome! What's your name?";
+            responseMedia = ["https://img.freepik.com/free-vector/stylish-welcome-lettering-banner-opening-new-office_1017-50438.jpg"];
             session.step = "getName";
             break;
 
         case "getName":
             session.name = incomingMsg;
             responseMessage = `Nice to meet you, ${session.name}! What's your grade?`;
+            responseMedia = ["https://i.cbc.ca/1.5721290.1693912253!/fileImage/httpImage/image.JPG_gen/derivatives/16x9_780/back-to-school-wexford-collegiate.JPG"];
             session.step = "getGrade";
             break;
 
         case "getGrade":
             session.grade = incomingMsg;
             responseMessage = "Please confirm your WhatsApp number (this will be used as your username and password).";
+            responseMedia = ["https://www.digitaltrends.com/wp-content/uploads/2022/06/whatsapp-iphone-android-logo-app.jpg?fit=720%2C479&p=1"];
             session.step = "getWhatsAppNumber";
             break;
 
@@ -122,6 +126,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
             session.username = incomingMsg;
             session.password = incomingMsg;
             responseMessage = `Confirm your details:\nName: ${session.name}\nGrade: ${session.grade}\nUsername: ${session.username}\nReply 'yes' to confirm or 'no' to re-enter.`;
+            responseMedia = ["https://img.freepik.com/premium-vector/confirm-button_592324-29144.jpg"];
             session.step = "confirmDetails";
             break;
 
@@ -141,7 +146,8 @@ app.post("/whatsapp-webhook", async (req, res) => {
                     };
                     try {
                         await syncUserToMoodle(newUser);
-                        responseMessage = "Registration successful! You can now log in to Samanala eSchool using your WhatsApp number as username and password.";
+                        responseMessage = `Registration successful!, \nDownload the app here: https://samanalaeschool.lk/app. \nYou can now log in to Samanala eSchool using your WhatsApp number as username and password.`;
+                        responseMedia = ["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQVITQzRf-V8mU6c-dSwCDT96Ib3OoAUVZLXA&s"];
                     } catch (error) {
                         responseMessage = "An error occurred during registration. Please try again.";
                     }
@@ -163,6 +169,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
         body: responseMessage,
         from: process.env.TWILIO_WHATSAPP_NUMBER,
         to: from,
+        mediaUrl: responseMedia,
     })
     .then((message) => console.log(`Message sent: ${message.sid}`))
     .catch((error) => console.error(error));
