@@ -14,7 +14,6 @@ const client = twilio(accountSid, authToken);
 
 const userSessions = {};
 
-
 function getUserSession(from) {
     if (!userSessions[from]) {
         userSessions[from] = { step: "greeting" };
@@ -99,17 +98,23 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     const session = getUserSession(from);
     let responseMessage;
-    let responseMedia = null; // Default to null unless successful registration
+    let responseMedia = null;
 
     switch (session.step) {
         case "greeting":
-            responseMessage = "Welcome! What's your name?";
-            session.step = "getName";
+            responseMessage = "Welcome! What's your first name?";
+            session.step = "getFirstName";
             break;
 
-        case "getName":
-            session.name = incomingMsg;
-            responseMessage = `Nice to meet you, ${session.name}! What's your grade?`;
+        case "getFirstName":
+            session.firstName = incomingMsg;
+            responseMessage = `Nice to meet you, ${session.firstName}! What's your last name?`;
+            session.step = "getLastName";
+            break;
+
+        case "getLastName":
+            session.lastName = incomingMsg;
+            responseMessage = `Hello, ${session.firstName} ${session.lastName}! What's your grade?`;
             session.step = "getGrade";
             break;
 
@@ -122,7 +127,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
         case "getWhatsAppNumber":
             session.username = incomingMsg;
             session.password = incomingMsg;
-            responseMessage = `Confirm your details:\nName: ${session.name}\nGrade: ${session.grade}\nUsername: ${session.username}\nReply 'yes' to confirm or 'no' to re-enter.`;
+            responseMessage = `Confirm your details:\nName: ${session.firstName} ${session.lastName}\nGrade: ${session.grade}\nUsername: ${session.username}\nReply 'yes' to confirm or 'no' to re-enter.`;
             session.step = "confirmDetails";
             break;
 
@@ -134,24 +139,24 @@ app.post("/whatsapp-webhook", async (req, res) => {
                 } else {
                     const newUser = {
                         mobileNo: session.username,
-                        firstName: session.name.split(" ")[0],
-                        lastName: session.name.split(" ").slice(1).join(" ") || "User",
+                        firstName: session.firstName,
+                        lastName: session.lastName,
                         className: "Class X",
                         grade: session.grade,
                         phone: session.username,
                     };
                     try {
                         await syncUserToMoodle(newUser);
-                        responseMessage = `Registration successful!\nDownload the app here: https://samanalaeschool.lk/app. You can now log in to Samanala 🦋 eSchool using your WhatsApp number as username and password.`;
-                        responseMedia = ["https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQVITQzRf-V8mU6c-dSwCDT96Ib3OoAUVZLXA&s"];
+                        responseMessage = `Registration successful!\nDownload the app here: https://samanalaeschool.lk/app. \nYou can now log in to Samanala 🦋 eSchool using your WhatsApp number as username and password.`;
+                        responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
                     } catch (error) {
                         responseMessage = "An error occurred during registration. Please try again.";
                     }
                 }
                 session.step = "greeting";
             } else {
-                responseMessage = "Let's start again. What's your name?";
-                session.step = "getName";
+                responseMessage = "Let's start again. What's your first name?";
+                session.step = "getFirstName";
             }
             break;
 
@@ -179,7 +184,6 @@ app.post("/whatsapp-webhook", async (req, res) => {
     console.log(`User: ${from}, Message: ${incomingMsg}, Step: ${session.step}`);
     res.status(200).end();
 });
-
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
