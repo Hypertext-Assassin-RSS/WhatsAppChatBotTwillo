@@ -27,3 +27,6 @@ jobs:
       # Push the Docker image
       - name: Push the Docker image
         run: docker push ghcr.io/hypertext-assassin-rss/twilio-whatsapp:latest
+
+      - name: Push the Docker image
+        run: docker push ghcr.io/samanala-tech/twilio-whatsapp:latest
