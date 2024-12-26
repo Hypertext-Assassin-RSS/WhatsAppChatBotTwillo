@@ -2,6 +2,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const twilio = require("twilio");
 const axios = require("axios");
+const { Pool } = require("pg");
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -11,8 +12,43 @@ require("dotenv").config();
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const client = twilio(accountSid, authToken);
+let courseID;
 
 const userSessions = {};
+
+const pool = new Pool({
+    connectionString: "postgresql://LMS_ID_owner:jy5qWSw1bmTB@ep-shrill-base-a11dk3gp.ap-southeast-1.aws.neon.tech/LMS_ID?sslmode=require",
+});
+
+
+(async () => {
+    try {
+        const client = await pool.connect();
+        console.log("Connected to PostgreSQL database successfully!");
+        client.release();
+    } catch (err) {
+        console.error("Error connecting to PostgreSQL database:", err);
+    }
+})();
+
+const checkEnrollId = async (enrollId) => {
+    try {
+        const query = `
+            SELECT * FROM public.moodle_courses WHERE enroll_id = $1;
+        `;
+        const values = [enrollId];
+        const result = await pool.query(query, values);
+
+        if (result.rows.length > 0) {
+            return { exists: true, course: result.rows[0] };
+        } else {
+            return { exists: false };
+        }
+    } catch (err) {
+        console.error("Error checking enroll_id:", err);
+        throw err;
+    }
+};
 
 function formatWhatsAppNumber(input) {
     const match = input.match(/whatsapp:\+94(\d+)/);
@@ -63,7 +99,6 @@ const syncUserToMoodle = async (user) => {
     const moodleToken = process.env.MOODLE_TOKEN;
     const functionName = 'core_user_create_users';
     const restFormat = 'json';
-    const courseID = process.env.COURSE_ID;
 
     try {
         const serverUrl = `${moodleUrl}/webservice/rest/server.php?wstoken=${moodleToken}&wsfunction=${functionName}&moodlewsrestformat=${restFormat}`;
@@ -100,6 +135,33 @@ const syncUserToMoodle = async (user) => {
     }
 };
 
+const enrollUserToMoodleCourse = async (username, courseId) => {
+    const moodleUrl = process.env.MOODLE_URL;
+    const moodleToken = process.env.MOODLE_TOKEN;
+    const functionName = 'enrol_manual_enrol_users';
+    const restFormat = 'json';
+
+    try {
+        const serverUrl = `${moodleUrl}/webservice/rest/server.php?wstoken=${moodleToken}&wsfunction=${functionName}&moodlewsrestformat=${restFormat}`;
+        const params = new URLSearchParams();
+        params.append('enrolments[0][roleid]', 5); // Role ID 5 is the default for "Student"
+        params.append('enrolments[0][userid]', username);
+        params.append('enrolments[0][courseid]', courseId);
+
+        const response = await axios.post(serverUrl, params.toString(), {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+        });
+
+        console.log('User enrolled in course:', response.data);
+        return true;
+    } catch (err) {
+        console.error('Error enrolling user in Moodle course:', err.response?.data || err);
+        throw err;
+    }
+};
+
 // WhatsApp webhook
 app.post("/whatsapp-webhook", async (req, res) => {
     const incomingMsg = req.body.Body.trim();
@@ -111,15 +173,25 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     switch (session.step) {
         case "greeting":
+            const erollment = await checkEnrollId(incomingMsg)
             const existingUser = await checkUserInMoodle(formatWhatsAppNumber(from));
-            if (existingUser) {
-
+            if (erollment.exists && existingUser) {
                 session.firstName = existingUser.firstname;
                 session.lastName = existingUser.lastname;
                 session.username = existingUser.username;
 
-                responseMessage = "Hello " + session.firstName + " " + session.lastName + "! You are already registered. What would you like to do?";
-                session.step = "getFirstName";
+                courseID = erollment.course.course_id;
+
+                console.log('LMS Course ID: ',courseID);
+
+                try {
+                    await enrollUserToMoodleCourse(existingUser.id, courseID);
+                    responseMessage = `Hello ${session.firstName} ${session.lastName}! You have been successfully enrolled in the course "${erollment.course.course_name}".`;
+                } catch (error) {
+                    responseMessage = `Hello ${session.firstName} ${session.lastName}! Enrollment failed. Please contact support.`;
+                }
+                session.step = "greeting";
+                
             } else {
                 responseMessage = "Welcome! What's your first name?";
                 session.step = "getFirstName";
