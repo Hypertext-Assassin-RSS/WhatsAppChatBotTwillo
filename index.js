@@ -52,6 +52,7 @@ const checkUserInMoodle = async (username) => {
         params.append('criteria[0][value]', username);
 
         const response = await axios.post(serverUrl, params.toString(), {
+            
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
@@ -150,8 +151,21 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     switch (session.step) {
         case "greeting":
-            responseMessage = "Welcome! What's your first name?";
-            session.step = "getFirstName";
+            try {
+                const existingUser = await checkUserInMoodle(from);
+                if (existingUser) {
+                    console.log(existingUser);
+                    responseMessage = "Welcome back!  What can I do for you?";
+                    session.step = "greeting";
+                } else {
+                    responseMessage = "Welcome! What's your first name?";
+                    session.step = "getFirstName";
+                }
+            } catch (error) {
+                console.error(`Error checking Moodle for user ${from}:`, error);
+                responseMessage = "An error occurred while checking your registration. Please try again later.";
+                session.step = "greeting";
+            }
             break;
 
         case "getFirstName":
