@@ -2,6 +2,8 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const twilio = require("twilio");
 const axios = require("axios");
+const http = require("http");
+const { neon } = require("@neondatabase/serverless");
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -13,6 +15,19 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const client = twilio(accountSid, authToken);
 
 const userSessions = {};
+let moodleUser;
+
+const sql = neon(process.env.DATABASE_URL);
+
+const requestHandler = async (req, res) => {
+  const result = await sql`SELECT version()`;
+  const { version } = result[0];
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  console.log(version);
+  res.end(version);
+};
+
+
 
 function getUserSession(from) {
     if (!userSessions[from]) {
@@ -20,6 +35,8 @@ function getUserSession(from) {
     }
     return userSessions[from];
 }
+
+
 
 // Check if user exists in Moodle
 const checkUserInMoodle = async (username) => {
@@ -40,6 +57,9 @@ const checkUserInMoodle = async (username) => {
             },
         });
 
+        await enrollUserInCourse(response.data[0]);
+        console.log(`User ${username} found in Moodle`);
+        
         const users = response.data.users;
         return users && users.length > 0 ? users[0] : null;
     } catch (err) {
@@ -87,6 +107,34 @@ const syncUserToMoodle = async (user) => {
         return response.data[0];
     } catch (err) {
         console.error('Error syncing user to Moodle:', err.response?.data || err);
+        throw err;
+    }
+};
+
+const enrollUserInCourse = async (user) => {
+    const moodleUrl = process.env.MOODLE_URL;
+    const moodleToken = process.env.MOODLE_TOKEN;
+    const lmscourseId = process.env.COURSE_ID;
+    const functionName = 'enrol_manual_enrol_users';
+    const restFormat = 'json';
+
+    try {
+        const serverUrl = `${moodleUrl}/webservice/rest/server.php?wstoken=${moodleToken}&wsfunction=${functionName}&moodlewsrestformat=${restFormat}`;
+        const params = new URLSearchParams();
+        params.append('enrolments[0][roleid]', '5');
+        params.append('enrolments[0][userid]', user.id);
+        params.append('enrolments[0][courseid]', lmscourseId);
+
+        const response = await axios.post(serverUrl, params.toString(), {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+        });
+
+        console.log(`User ${user.username} enrolled in course : ${lmscourseId}`);
+        return response.data;
+    } catch (err) {
+        console.error('Error enrolling user in Moodle course:', err.response?.data || err);
         throw err;
     }
 };
@@ -146,7 +194,9 @@ app.post("/whatsapp-webhook", async (req, res) => {
                         phone: session.username,
                     };
                     try {
-                        await syncUserToMoodle(newUser);
+                        moodleUser = await syncUserToMoodle(newUser);
+                        await enrollUserInCourse(moodleUser);
+                        console.log(`User ${session.username} registered successfully`);
                         responseMessage = `Registration successful!\nDownload the app here: https://samanalaeschool.lk/app. \nYou can now log in to Samanala 🦋 eSchool using your WhatsApp number as username and password.`;
                         responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
                     } catch (error) {
@@ -186,6 +236,11 @@ app.post("/whatsapp-webhook", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
+
+app.listen(PORT,  () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
+http.createServer(requestHandler).listen(3000, () => {
+    console.log("Server running at http://localhost:3000");
+  });
