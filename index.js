@@ -14,6 +14,15 @@ const client = twilio(accountSid, authToken);
 
 const userSessions = {};
 
+function formatWhatsAppNumber(input) {
+    const match = input.match(/whatsapp:\+94(\d+)/);
+    if (match) {
+        return '0' + match[1];
+    } else {
+        throw new Error('Invalid WhatsApp number format');
+    }
+}
+
 function getUserSession(from) {
     if (!userSessions[from]) {
         userSessions[from] = { step: "greeting" };
@@ -102,8 +111,19 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     switch (session.step) {
         case "greeting":
-            responseMessage = "Welcome! What's your first name?";
-            session.step = "getFirstName";
+            const existingUser = await checkUserInMoodle(formatWhatsAppNumber(from));
+            if (existingUser) {
+
+                session.firstName = existingUser.firstname;
+                session.lastName = existingUser.lastname;
+                session.username = existingUser.username;
+
+                responseMessage = "Hello " + session.firstName + " " + session.lastName + "! You are already registered. What would you like to do?";
+                session.step = "getFirstName";
+            } else {
+                responseMessage = "Welcome! What's your first name?";
+                session.step = "getFirstName";
+            }
             break;
 
         case "getFirstName":
