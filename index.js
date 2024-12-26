@@ -17,7 +17,7 @@ let courseID;
 const userSessions = {};
 
 const pool = new Pool({
-    connectionString: "postgresql://LMS_ID_owner:jy5qWSw1bmTB@ep-shrill-base-a11dk3gp.ap-southeast-1.aws.neon.tech/LMS_ID?sslmode=require",
+    connectionString:process.env.connectionString
 });
 
 
@@ -104,7 +104,7 @@ const syncUserToMoodle = async (user) => {
         const serverUrl = `${moodleUrl}/webservice/rest/server.php?wstoken=${moodleToken}&wsfunction=${functionName}&moodlewsrestformat=${restFormat}`;
         const params = new URLSearchParams();
         params.append('users[0][username]', user.mobileNo);
-        params.append('users[0][email]', `${user.mobileNo}@${courseID}.com`);
+        params.append('users[0][email]', `${user.mobileNo}@whatsapp.com`);
         params.append('users[0][firstname]', user.firstName);
         params.append('users[0][lastname]', user.lastName);
         params.append('users[0][password]', user.mobileNo);
@@ -173,30 +173,37 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     switch (session.step) {
         case "greeting":
-            const erollment = await checkEnrollId(incomingMsg)
-            const existingUser = await checkUserInMoodle(formatWhatsAppNumber(from));
-            if (erollment.exists && existingUser) {
-                session.firstName = existingUser.firstname;
-                session.lastName = existingUser.lastname;
-                session.username = existingUser.username;
+    const enrollment = await checkEnrollId(incomingMsg);
+    const existingUser = await checkUserInMoodle(formatWhatsAppNumber(from));
 
-                courseID = erollment.course.course_id;
+    if (enrollment.exists && existingUser) {
+        session.firstName = existingUser.firstname;
+        session.lastName = existingUser.lastname;
+        session.username = existingUser.username;
 
-                console.log('LMS Course ID: ',courseID);
+        courseID = enrollment.course.course_id;
 
-                try {
-                    await enrollUserToMoodleCourse(existingUser.id, courseID);
-                    responseMessage = `Hello ${session.firstName} ${session.lastName}! You have been successfully enrolled in the course "${erollment.course.course_name}".`;
-                } catch (error) {
-                    responseMessage = `Hello ${session.firstName} ${session.lastName}! Enrollment failed. Please contact support.`;
-                }
-                session.step = "greeting";
-                
-            } else {
-                responseMessage = "Welcome! What's your first name?";
-                session.step = "getFirstName";
-            }
-            break;
+        console.log('LMS Course ID: ', courseID);
+
+        try {
+            await enrollUserToMoodleCourse(existingUser.id, courseID);
+            responseMessage = `Hello ${session.firstName} ${session.lastName}! You have been successfully enrolled in the course "${enrollment.course.course_name}".`;
+        } catch (error) {
+            responseMessage = `Hello ${session.firstName} ${session.lastName}! Enrollment failed. Please contact support.`;
+        }
+        session.step = "greeting";
+        } else if (enrollment.exists && !existingUser) {
+            courseID = enrollment.course.course_id;
+            session.courseName = enrollment.course.course_name;
+
+            responseMessage = `Welcome! You are not registered in our system. Let's register you for the course "${session.courseName}". What's your first name?`;
+            session.step = "getFirstName";
+        } else {
+            responseMessage = "Enrollment ID not found. Please enter a valid enrollment ID.";
+            session.step = "greeting";
+        }
+        break;
+
 
         case "getFirstName":
             session.firstName = incomingMsg;
@@ -206,52 +213,83 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
         case "getLastName":
             session.lastName = incomingMsg;
-            responseMessage = `Hello, ${session.firstName} ${session.lastName}! What's your grade?`;
+            responseMessage = `Hello, ${session.firstName} ${session.lastName}! What's your grade? \n 
+            1️⃣)Grade 1 \n 2️⃣)Grade 2 \n 3️⃣)Grade 3 \n 4️⃣)Grade 4 \n 5️⃣)Grade 5 \n 6️⃣)Grade 6 \n 7️⃣)Grade 7 \n 8️⃣)Grade 8 \n 9️⃣)Grade 9 \n 1️⃣0️⃣)Grade 10`;
             session.step = "getGrade";
             break;
 
-        case "getGrade":
-            session.grade = incomingMsg;
-            responseMessage = "Please confirm your WhatsApp number (this will be used as your username and password).";
-            session.step = "getWhatsAppNumber";
-            break;
+            case "getGrade":
+                // Match the user's input to the corresponding grade
+                const gradeMap = {
+                    "1": " Grade 1",
+                    "2": " Grade 2",
+                    "3": " Grade 3",
+                    "4": " Grade 4",
+                    "5": " Grade 5",
+                    "6": " Grade 6",
+                    "7": " Grade 7",
+                    "8": " Grade 8",
+                    "9": " Grade 9",
+                    "10":" Grade 10"
+                };
+            
+                const selectedGrade = gradeMap[incomingMsg.trim()];
+            
+                if (selectedGrade) {
+                    session.grade = selectedGrade;
+                    responseMessage = `You selected ${selectedGrade}. \nPlease confirm your WhatsApp number (this will be used as your username and password).`;
+                    session.step = "getWhatsAppNumber";
+                } else {
+                    responseMessage = "Invalid choice. Please select a valid grade from the list:\n" +
+                        "1️⃣) Grade 1 \n2️⃣) Grade 2 \n3️⃣) Grade 3 \n4️⃣) Grade 4 \n5️⃣) Grade 5 \n6️⃣) Grade 6 \n7️⃣) Grade 7 \n8️⃣) Grade 8 \n9️⃣) Grade 9 \n1️⃣0️⃣) Grade 10";
+                    session.step = "getGrade";
+                }
+                break;
+            
 
-        case "getWhatsAppNumber":
+            case "getWhatsAppNumber":
             session.username = incomingMsg;
             session.password = incomingMsg;
-            responseMessage = `Confirm your details:\nName: ${session.firstName} ${session.lastName}\nGrade: ${session.grade}\nUsername: ${session.username}\nReply 'yes' to confirm or 'no' to re-enter.`;
+            responseMessage = `Confirm your details:\nName: ${session.firstName} ${session.lastName}\nGrade: ${session.grade}\nUsername: ${session.username}\nReply '1' to confirm or '2' to re-enter.`;
             session.step = "confirmDetails";
             break;
 
-        case "confirmDetails":
-            if (incomingMsg.toLowerCase() === "yes") {
-                const existingUser = await checkUserInMoodle(session.username);
-                if (existingUser) {
-                    responseMessage = "You are already registered.";
-                } else {
-                    const newUser = {
-                        mobileNo: session.username,
-                        firstName: session.firstName,
-                        lastName: session.lastName,
-                        className: "Class X",
-                        grade: session.grade,
-                        phone: session.username,
-                    };
-                    try {
-                        await syncUserToMoodle(newUser);
-                        responseMessage = `Registration successful!\nDownload the app here: https://samanalaeschool.lk/app. \nYou can now log in to Samanala 🦋 eSchool using your WhatsApp number as username and password.`;
-                        responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
-                    } catch (error) {
-                        responseMessage = "An error occurred during registration. Please try again.";
+            case "confirmDetails":
+                if (incomingMsg.toLowerCase() === '1') {
+                    const existingUser = await checkUserInMoodle(session.username);
+                    if (existingUser) {
+                        responseMessage = "You are already registered.";
+                    } else {
+                        const newUser = {
+                            mobileNo: session.username,
+                            firstName: session.firstName,
+                            lastName: session.lastName,
+                            className: "Class X",
+                            grade: session.grade,
+                            phone: session.username,
+                        };
+                        try {
+                            const moodleUser = await syncUserToMoodle(newUser);
+                            const userId = moodleUser.id;
+            
+                            try {
+                                await enrollUserToMoodleCourse(userId, courseID);
+                                responseMessage = `Registration and enrollment successful!\nYou have been enrolled in the course "${session.courseName}".\nDownload the app here: https://samanalaeschool.lk/app. You can now log in to Samanala 🦋 eSchool using your WhatsApp number as username and password.`;
+                                responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
+                            } catch (error) {
+                                responseMessage = `Registration successful, but enrollment failed. Please contact support.`;
+                            }
+                        } catch (error) {
+                            responseMessage = "An error occurred during registration. Please try again.";
+                        }
                     }
+                    session.step = "greeting";
+                } else {
+                    responseMessage = "Let's start again. What's your first name?";
+                    session.step = "getFirstName";
                 }
-                session.step = "greeting";
-            } else {
-                responseMessage = "Let's start again. What's your first name?";
-                session.step = "getFirstName";
-            }
-            break;
-
+                break;
+            
         default:
             responseMessage = "An error occurred. Please start again.";
             session.step = "greeting";
