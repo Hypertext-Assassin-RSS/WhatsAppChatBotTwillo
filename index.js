@@ -173,86 +173,60 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     switch (session.step) {
         case "greeting":
-    const enrollment = await checkEnrollId(incomingMsg);
-    const existingUser = await checkUserInMoodle(formatWhatsAppNumber(from));
+            const enrollment = await checkEnrollId(incomingMsg);
+            const existingUser = await checkUserInMoodle(formatWhatsAppNumber(from));
 
-    if (enrollment.exists && existingUser) {
-        session.firstName = existingUser.firstname;
-        session.lastName = existingUser.lastname;
-        session.username = existingUser.username;
+            if (enrollment.exists && existingUser) {
+                session.firstName = existingUser.firstname;
+                session.lastName = existingUser.lastname;
+                session.username = existingUser.username;
 
-        courseID = enrollment.course.course_id;
+                courseID = enrollment.course.course_id;
 
-        console.log('LMS Course ID: ', courseID);
+                console.log('LMS Course ID: ', courseID);
 
-        try {
-            await enrollUserToMoodleCourse(existingUser.id, courseID);
-            responseMessage = `Hello ${session.firstName} ${session.lastName}! You have been successfully enrolled in the course "${enrollment.course.course_name}".`;
-        } catch (error) {
-            responseMessage = `Hello ${session.firstName} ${session.lastName}! Enrollment failed. Please contact support.`;
-        }
-        session.step = "greeting";
-        } else if (enrollment.exists && !existingUser) {
-            courseID = enrollment.course.course_id;
-            session.courseName = enrollment.course.course_name;
-
-            responseMessage = `Welcome! You are not registered in our system. Let's register you for the course "${session.courseName}". What's your first name?`;
-            session.step = "getFirstName";
-        } else {
-            responseMessage = "Enrollment ID not found. Please enter a valid enrollment ID.";
-            session.step = "greeting";
-        }
-        break;
-
-
-        case "getFirstName":
-            session.firstName = incomingMsg;
-            responseMessage = `Nice to meet you, ${session.firstName}! What's your last name?`;
-            session.step = "getLastName";
-            break;
-
-        case "getLastName":
-            session.lastName = incomingMsg;
-            responseMessage = `Hello, ${session.firstName} ${session.lastName}! What's your grade? \n 
-            1️⃣)Grade 1 \n 2️⃣)Grade 2 \n 3️⃣)Grade 3 \n 4️⃣)Grade 4 \n 5️⃣)Grade 5 \n 6️⃣)Grade 6 \n 7️⃣)Grade 7 \n 8️⃣)Grade 8 \n 9️⃣)Grade 9 \n 1️⃣0️⃣)Grade 10`;
-            session.step = "getGrade";
-            break;
-
-            case "getGrade":
-                // Match the user's input to the corresponding grade
-                const gradeMap = {
-                    "1": " Grade 1",
-                    "2": " Grade 2",
-                    "3": " Grade 3",
-                    "4": " Grade 4",
-                    "5": " Grade 5",
-                    "6": " Grade 6",
-                    "7": " Grade 7",
-                    "8": " Grade 8",
-                    "9": " Grade 9",
-                    "10":" Grade 10"
-                };
-            
-                const selectedGrade = gradeMap[incomingMsg.trim()];
-            
-                if (selectedGrade) {
-                    session.grade = selectedGrade;
-                    responseMessage = `You selected ${selectedGrade}. \nPlease confirm your WhatsApp number (this will be used as your username and password).`;
-                    session.step = "getWhatsAppNumber";
-                } else {
-                    responseMessage = "Invalid choice. Please select a valid grade from the list:\n" +
-                        "1️⃣) Grade 1 \n2️⃣) Grade 2 \n3️⃣) Grade 3 \n4️⃣) Grade 4 \n5️⃣) Grade 5 \n6️⃣) Grade 6 \n7️⃣) Grade 7 \n8️⃣) Grade 8 \n9️⃣) Grade 9 \n1️⃣0️⃣) Grade 10";
-                    session.step = "getGrade";
+                try {
+                    await enrollUserToMoodleCourse(existingUser.id, courseID);
+                    responseMessage = `Hello ${session.firstName} ${session.lastName}! You have been successfully enrolled in the course "${enrollment.course.course_name}".`;
+                } catch (error) {
+                    responseMessage = `Hello ${session.firstName} ${session.lastName}! Enrollment failed. Please contact support.`;
                 }
+                session.step = "greeting";
+                } else if (enrollment.exists && !existingUser) {
+                    courseID = enrollment.course.course_id;
+                    session.courseName = enrollment.course.course_name;
+                    session.grade = enrollment.course.grade;
+
+                    responseMessage = `Welcome! You are not registered in our system. Let's register you for the course "${session.courseName}". What's your first name?`;
+                    session.step = "getFirstName";
+                } else {
+                    responseMessage = "Enrollment ID not found. Please enter a valid enrollment ID.";
+                    session.step = "greeting";
+                }
+                break;
+
+
+            case "getFirstName":
+                session.firstName = incomingMsg;
+                responseMessage = `Nice to meet you, ${session.firstName}! What's your last name?`;
+                session.step = "getLastName";
+                break;
+
+
+            case "getLastName":
+                session.lastName = incomingMsg;
+                responseMessage = `Hello, ${session.firstName} ${session.lastName}! 
+                \nPlease Remember ${formatWhatsAppNumber(from)} your WhatsApp number (this will be used as your username and password). \nReply '1' to Continue.`;
+                session.step = "getWhatsAppNumber";
                 break;
             
 
             case "getWhatsAppNumber":
-            session.username = incomingMsg;
-            session.password = incomingMsg;
-            responseMessage = `Confirm your details:\nName: ${session.firstName} ${session.lastName}\nGrade: ${session.grade}\nUsername: ${session.username}\nReply '1' to confirm or '2' to re-enter.`;
-            session.step = "confirmDetails";
-            break;
+                session.username = formatWhatsAppNumber(from);
+                session.password = incomingMsg;
+                responseMessage = `Confirm your details:\nName: ${session.firstName} ${session.lastName}\nGrade: ${session.grade}\nUsername: ${session.username}\nReply '1' to confirm or '2' to re-enter.`;
+                session.step = "confirmDetails";
+                break;
 
             case "confirmDetails":
                 if (incomingMsg.toLowerCase() === '1') {
