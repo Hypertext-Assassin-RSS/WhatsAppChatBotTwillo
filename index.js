@@ -199,7 +199,11 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
                     responseMessage = `Welcome! You are not registered in our system. Let's register you for the course "${session.courseName}". What's your first name?`;
                     session.step = "getFirstName";
-                } else {
+                } else if (incomingMsg == '25010301') {
+                    responseMessage = "Welcome To English Course. Please Reply 1 to enroll.";
+                    session.step = "greeting";
+                }
+                else {
                     responseMessage = "Enrollment ID not found. Please enter a valid enrollment ID.";
                     session.step = "greeting";
                 }
