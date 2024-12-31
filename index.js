@@ -98,11 +98,17 @@ function getUserSession(from) {
 
 
 
+// Helper function to add timeout
+function withTimeout(promise, timeoutMs) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
+    ]);
+}
 
-// Check if user exists in Moodle
-const checkUserInMoodle = async (username) => {
+const checkUserInMoodle = async (username, timeoutMs = 5000) => {
     console.log('Checking user in Moodle:', username);
-    
+
     const moodleUrl = process.env.MOODLE_URL;
     const moodleToken = process.env.MOODLE_TOKEN;
     const functionName = 'core_user_get_users';
@@ -114,18 +120,25 @@ const checkUserInMoodle = async (username) => {
         params.append('criteria[0][key]', 'username');
         params.append('criteria[0][value]', username);
 
-        const response = await axios.post(serverUrl, params.toString(), {
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-        });
+        const response = await withTimeout(
+            axios.post(serverUrl, params.toString(), {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+            }),
+            timeoutMs
+        );
 
         console.log('User exists in Moodle:', response.data);
         const users = response.data.users;
         return users && users.length > 0 ? users[0] : null;
     } catch (err) {
-        console.error(`Error checking user in Moodle for username ${username}:`, err.response?.data || err);
-        throw err;
+        if (err.message === 'Timeout') {
+            console.error(`Timeout checking user in Moodle for username ${username}`);
+        } else {
+            console.error(`Error checking user in Moodle for username ${username}:`, err.response?.data || err);
+        }
+        return [];
     }
 };
 
@@ -226,7 +239,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
                     await enrollUserToMoodleCourse(existingUser.id, courseID);
                     responseMessage = `Hello ${session.firstName} ${session.lastName}! You have been successfully enrolled in the course "${enrollment.course.course_name}".`;
                 } catch (error) {
-                    responseMessage = `Hello ${session.firstName} ${session.lastName}! Enrollment failed. Please contact support.`;
+                    responseMessage = `Sorry! Enrollment failed. Please contact support.`;
                 }
                 session.step = "greeting";
                 } else if (enrollment.exists && !existingUser) {
@@ -237,7 +250,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
                     responseMessage = `Welcome! You are not registered in our system. Let's register you for the course "${session.courseName}". What's your first name?`;
                     session.step = "getFirstName";
                 } else if (groupEnrollment.exists) {
-                    responseMessage = `Welcome To ${groupEnrollment.course.course_name}. Please Use ${groupEnrollment.course.group_link} to join the group.`;
+                    responseMessage = `Welcome To ${groupEnrollment.course.course_name} Course. Please Use ${groupEnrollment.course.group_link} to join the group.`;
                     session.step = "greeting";
                 }
                 else {
