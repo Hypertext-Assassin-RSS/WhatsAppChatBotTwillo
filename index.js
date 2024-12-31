@@ -3,6 +3,7 @@ const bodyParser = require("body-parser");
 const twilio = require("twilio");
 const axios = require("axios");
 const { Pool } = require("pg");
+const qs = require('qs');
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -32,6 +33,8 @@ const pool = new Pool({
 })();
 
 const checkEnrollId = async (enrollId) => {
+    console.log('Checking enroll_id:', enrollId);
+
     try {
         const query = `
             SELECT * FROM public.moodle_courses WHERE enroll_id = $1;
@@ -40,8 +43,12 @@ const checkEnrollId = async (enrollId) => {
         const result = await pool.query(query, values);
 
         if (result.rows.length > 0) {
+            console.log('Enroll_id exists:', enrollId);
+
             return { exists: true, course: result.rows[0] };
         } else {
+            console.log('Enroll_id does not exist:', enrollId);
+
             return { exists: false };
         }
     } catch (err) {
@@ -66,8 +73,46 @@ function getUserSession(from) {
     return userSessions[from];
 }
 
+const checkInMoodle = async (username) => {
+
+    console.log('Checking in for user:', username);
+
+    let data = qs.stringify({
+        'wstoken': 'a821686ba89578f12d66dc5146abd0a8',
+        'wsfunction': 'core_user_get_users',
+        'criteria[0][key]': 'username',
+        'criteria[0][value]': '0765901293',
+        'moodlewsrestformat': 'json' 
+    });
+    
+    let config = {
+        method: 'post',
+        maxBodyLength: Infinity,
+        url: 'https://samanalaeschool.lk/webservice/rest/server.php',
+        headers: { 
+        'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        data : data
+    };
+
+    try {
+        axios.request(config)
+            .then((response) => {
+            console.log(JSON.stringify(response.data));
+            return users && users.length > 0 ? users[0] : null;
+            
+    })
+    } catch (error) {
+        console.log(error);
+    }
+};
+
+
+
 // Check if user exists in Moodle
 const checkUserInMoodle = async (username) => {
+    console.log('Checking user in Moodle:', username);
+    
     const moodleUrl = process.env.MOODLE_URL;
     const moodleToken = process.env.MOODLE_TOKEN;
     const functionName = 'core_user_get_users';
@@ -85,6 +130,7 @@ const checkUserInMoodle = async (username) => {
             },
         });
 
+        console.log('User exists in Moodle:', response.data);
         const users = response.data.users;
         return users && users.length > 0 ? users[0] : null;
     } catch (err) {
@@ -164,7 +210,7 @@ const enrollUserToMoodleCourse = async (username, courseId) => {
 
 // WhatsApp webhook
 app.post("/whatsapp-webhook", async (req, res) => {
-    const incomingMsg = req.body.Body.trim();
+    const incomingMsg = req.body?.Body?.trim();
     const from = req.body.From;
 
     const session = getUserSession(from);

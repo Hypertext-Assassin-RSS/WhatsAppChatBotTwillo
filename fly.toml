@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for whatsapp-edu-bot on 2024-11-08T09:34:33+05:30
+# fly.toml app configuration file generated for twillo-whatsapp-bot on 2024-12-30T11:24:53+05:30
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'whatsapp-edu-bot-quiet-grass-5298'
+app = 'twillo-whatsapp-bot'
 primary_region = 'sin'
 
 [build]
