@@ -57,6 +57,29 @@ const checkEnrollId = async (enrollId) => {
     }
 };
 
+const checkGroupEnrollId = async (enrollId) => {
+    console.log('Checking group enroll_id:', enrollId);
+
+    try {
+        const query = `SELECT * FROM public.groups WHERE enroll_id = $1;`;
+        const values = [enrollId];
+        const result = await pool.query(query, values);
+
+        if (result.rows.length > 0) {
+            console.log('Group Enroll_id exists:', enrollId);
+
+            return { exists: true, course: result.rows[0] };
+        } else {
+            console.log('Group Enroll_id does not exist:', enrollId);
+
+            return { exists: false };
+        }
+    } catch (err) {
+        console.error("Error checking enroll_id:", err);
+        throw err;
+    }
+};
+
 function formatWhatsAppNumber(input) {
     const match = input.match(/whatsapp:\+94(\d+)/);
     if (match) {
@@ -73,39 +96,6 @@ function getUserSession(from) {
     return userSessions[from];
 }
 
-const checkInMoodle = async (username) => {
-
-    console.log('Checking in for user:', username);
-
-    let data = qs.stringify({
-        'wstoken': 'a821686ba89578f12d66dc5146abd0a8',
-        'wsfunction': 'core_user_get_users',
-        'criteria[0][key]': 'username',
-        'criteria[0][value]': '0765901293',
-        'moodlewsrestformat': 'json' 
-    });
-    
-    let config = {
-        method: 'post',
-        maxBodyLength: Infinity,
-        url: 'https://samanalaeschool.lk/webservice/rest/server.php',
-        headers: { 
-        'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        data : data
-    };
-
-    try {
-        axios.request(config)
-            .then((response) => {
-            console.log(JSON.stringify(response.data));
-            return users && users.length > 0 ? users[0] : null;
-            
-    })
-    } catch (error) {
-        console.log(error);
-    }
-};
 
 
 
@@ -219,6 +209,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     switch (session.step) {
         case "greeting":
+            const groupEnrollment = await checkGroupEnrollId(incomingMsg);
             const enrollment = await checkEnrollId(incomingMsg);
             const existingUser = await checkUserInMoodle(formatWhatsAppNumber(from));
 
@@ -245,8 +236,8 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
                     responseMessage = `Welcome! You are not registered in our system. Let's register you for the course "${session.courseName}". What's your first name?`;
                     session.step = "getFirstName";
-                } else if (incomingMsg == '25010301') {
-                    responseMessage = "Welcome To English Course. Please Reply 1 to enroll.";
+                } else if (groupEnrollment.exists) {
+                    responseMessage = `Welcome To ${groupEnrollment.course.course_name}. Please Use ${groupEnrollment.course.group_link} to join the group.`;
                     session.step = "greeting";
                 }
                 else {
