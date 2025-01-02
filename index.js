@@ -251,7 +251,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
                 try {
                     await enrollUserToMoodleCourse(existingUser.id, courseID);
-                    responseMessage = `හමුවිම සතුටක් 😊 ${session.firstName} ${session.lastName}! ඔබගේ අතුලත් වීම සාර්තකයි. \n ඔබ අපගේ "${enrollment.course.course_name}" පන්තියට සම්බන්ඳ  වි ඇත.`;
+                    responseMessage = `හමුවිම සතුටක් 😊 ${session.firstName} ${session.lastName}! ඔබගේ ඇතුලත් වීම සාර්තකයි. \n ඔබ අපගේ "${enrollment.course.course_name}" පන්තියට සම්බන්ඳ  වි ඇත.`;
                 } catch (error) {
                     responseMessage = `කනගාටුයි ඇතුලත් වීමේ කේතය නැවත එවා උත්සාහ කරන්න!`;
                 }
@@ -261,7 +261,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
                 session.courseName = enrollment.course.course_name;
                 session.grade = enrollment.course.grade;
 
-                responseMessage = `Welcome! සමනල දැනුම ආයතනයට සාදරයෙන් පිලිගනිමු 🙏. "${session.courseName}". පාඨමාලාව සඳහා ඔබව අතුලත් කරගනිමු ඔබගේ පළමු නම ( First Name ) එවන්න`;
+                responseMessage = `Welcome! සමනල දැනුම ආයතනයට සාදරයෙන් පිලිගනිමු 🙏. "${session.courseName}". පාඨමාලාව සඳහා ඔබව ඇතුලත් කරගනිමු ඔබගේ පළමු නම ( First Name ) එවන්න`;
                 session.step = "getFirstName";
             } else if (groupEnrollment.exists) {
                 responseMessage = `Welcome To ${groupEnrollment.course.course_name} Course. Please Use ${groupEnrollment.course.group_link} to join the group.`;
@@ -305,7 +305,9 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
                         try {
                             await enrollUserToMoodleCourse(userId, courseID);
-                            responseMessage = `ඔබගේ ලියාපදින්චිය සාර්තකයි!\nඔබ අපගේ "${session.courseName}" පන්තියට සම්බන්ඳ  වි ඇත.\nDownload the app here: https://shorturl.at/hKmI8. \nඇතුල්විම සඳහා ඔබ අප හා සම්බන්ඳ වූ WhatsApp දුරකථන අංකය username හා password ලෙස භාවිතා කරන්න `;
+                            responseMessage = `ඔබගේ ලියාපදින්චිය සාර්තකයි!\nඔබ අපගේ "${session.courseName}" පන්තියට සම්බන්ඳ  වි ඇත.\nDownload the app here: https://shorturl.at/hKmI8. \nඇතුල්විම සඳහා ඔබ අප හා සම්බන්ඳ වූ WhatsApp දුරකථන අංකය username හා password ලෙස භාවිතා කරන්න \n \n \n \n
+                            මෙම e පාසලෙන් ලැබෙන සියලු දැනුම ලබා ගැනීමට ඔබ තවමත් "${session.courseName}" මිලදිගෙන නැති නම් දැන්ම ඔබගේ ළඟම ඇති පුවත්පත් හලෙන් මිලදි ගන්න නැතහොත් \nසුසන්ත මහතා 📞 0768288636 , \nසසිනි මහත්මිය 📞 0760991306 \n අමතා ඔබගේ නිවසටම ගෙන්වාගන්න.
+                            `;
                             responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
                         } catch (error) {
                             responseMessage = `Registration successful!`;
