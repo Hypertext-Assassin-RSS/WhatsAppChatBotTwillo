@@ -18,9 +18,8 @@ let courseID;
 const userSessions = {};
 
 const pool = new Pool({
-    connectionString:process.env.CONNECTION_STRING
+    connectionString: process.env.CONNECTION_STRING
 });
-
 
 (async () => {
     try {
@@ -44,11 +43,9 @@ const checkEnrollId = async (enrollId) => {
 
         if (result.rows.length > 0) {
             console.log('Enroll_id exists:', enrollId);
-
             return { exists: true, course: result.rows[0] };
         } else {
             console.log('Enroll_id does not exist:', enrollId);
-
             return { exists: false };
         }
     } catch (err) {
@@ -67,11 +64,9 @@ const checkGroupEnrollId = async (enrollId) => {
 
         if (result.rows.length > 0) {
             console.log('Group Enroll_id exists:', enrollId);
-
             return { exists: true, course: result.rows[0] };
         } else {
             console.log('Group Enroll_id does not exist:', enrollId);
-
             return { exists: false };
         }
     } catch (err) {
@@ -80,16 +75,16 @@ const checkGroupEnrollId = async (enrollId) => {
     }
 };
 
-async function logMessage(userId, direction, message) {
+async function saveConversation(userId, conversationJson) {
     const query = `
-        INSERT INTO bot_conversations (user_id, direction, message)
-        VALUES ($1, $2, $3);
+        INSERT INTO bot_conversations (user_id, message)
+        VALUES ($1, $2);
     `;
-    const values = [userId, direction, message];
+    const values = [userId, conversationJson];
     try {
         await pool.query(query, values);
     } catch (err) {
-        console.error("Error logging message:", err);
+        console.error("Error saving conversation:", err);
     }
 }
 
@@ -104,7 +99,7 @@ function formatWhatsAppNumber(input) {
 
 function getUserSession(from) {
     if (!userSessions[from]) {
-        userSessions[from] = { step: "greeting" };
+        userSessions[from] = { step: "greeting", conversation: [] };
     }
     return userSessions[from];
 }
@@ -224,17 +219,25 @@ const enrollUserToMoodleCourse = async (username, courseId) => {
 
 // WhatsApp webhook
 app.post("/whatsapp-webhook", async (req, res) => {
+    let enrollment;
+    let groupEnrollment;
+
     const incomingMsg = req.body?.Body?.trim();
     const from = req.body.From;
 
     const session = getUserSession(from);
+
+    session.conversation.push({ direction: 'incoming', message: incomingMsg });
+
     let responseMessage;
     let responseMedia = null;
 
     switch (session.step) {
         case "greeting":
-            const groupEnrollment = await checkGroupEnrollId(incomingMsg);
-            const enrollment = await checkEnrollId(incomingMsg);
+            if (/^\d{8}$/.test(incomingMsg)) {
+                groupEnrollment = await checkGroupEnrollId(incomingMsg);
+                enrollment = await checkEnrollId(incomingMsg);
+            }
             const existingUser = await checkUserInMoodle(formatWhatsAppNumber(from));
 
             if (enrollment.exists && existingUser) {
@@ -248,90 +251,83 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
                 try {
                     await enrollUserToMoodleCourse(existingUser.id, courseID);
-                    responseMessage = `Hello ${session.firstName} ${session.lastName}! You have been successfully enrolled in the course "${enrollment.course.course_name}".`;
+                    responseMessage = `හමුවිම සතුටක් 😊 ${session.firstName} ${session.lastName}! ඔබගේ අතුලත් වීම සාර්තකයි. \n ඔබ අපගේ "${enrollment.course.course_name}" පන්තියට සම්බන්ඳ  වි ඇත.`;
                 } catch (error) {
-                    responseMessage = `Sorry! Enrollment failed. Please contact support.`;
+                    responseMessage = `කනගාටුයි ඇතුලත් වීමේ කේතය නැවත එවා උත්සාහ කරන්න!`;
                 }
                 session.step = "greeting";
-                } else if (enrollment.exists && !existingUser) {
-                    courseID = enrollment.course.course_id;
-                    session.courseName = enrollment.course.course_name;
-                    session.grade = enrollment.course.grade;
+            } else if (enrollment.exists && !existingUser) {
+                courseID = enrollment.course.course_id;
+                session.courseName = enrollment.course.course_name;
+                session.grade = enrollment.course.grade;
 
-                    responseMessage = `Welcome! You are not registered in our system. Let's register you for the course "${session.courseName}". What's your first name?`;
-                    session.step = "getFirstName";
-                } else if (groupEnrollment.exists) {
-                    responseMessage = `Welcome To ${groupEnrollment.course.course_name} Course. Please Use ${groupEnrollment.course.group_link} to join the group.`;
-                    session.step = "greeting";
-                }
-                else {
-                    responseMessage = `Hello Welcome To Samanala Danuma eSchool. Are you trying to enroll in a course or join a group? \nplease replay enroll code for course enrollment or '1' for contacting support.`;
-                    session.step = "greeting";
-                }
-                break;
-            case "getFirstName":
-                session.firstName = incomingMsg;
-                responseMessage = `Nice to meet you, ${session.firstName}! What's your last name?`;
-                session.step = "getLastName";
-                break;
+                responseMessage = `Welcome! සමනල දැනුම ආයතනයට සාදරයෙන් පිලිගනිමු 🙏. "${session.courseName}". පාඨමාලාව සඳහා ඔබව අතුලත් කරගනිමු ඔබගේ පළමු නම ( First Name ) එවන්න`;
+                session.step = "getFirstName";
+            } else if (groupEnrollment.exists) {
+                responseMessage = `Welcome To ${groupEnrollment.course.course_name} Course. Please Use ${groupEnrollment.course.group_link} to join the group.`;
+                session.step = "greeting";
+            } else {
+                responseMessage = `ආයුබොවන් 🙏 සමනල දැනුම ආයතනය සම්බන්ද කරගැනීම සඳහා \nසුසන්ත මහතා 📞 0768288636 , \nසසිනි මහත්මිය 📞 0760991306 අමතන්න .`;
+                session.step = "greeting";
+            }
+            break;
+        case "getFirstName":
+            session.firstName = incomingMsg;
+            responseMessage = `හමුවිම සතුටක් 😊, ${session.firstName} ඔබගේ වාසගම ( Last Name ) එවන්න `;
+            session.step = "getWhatsAppNumber";
+            break;
 
+        case "getWhatsAppNumber":
+            session.username = formatWhatsAppNumber(from);
+            session.password = formatWhatsAppNumber(from);
+            session.lastName = incomingMsg;
+            responseMessage = `කරුනාකර ඔබගේ තොරතුරු තහවුරු කරගන්න .:\n නම: ${session.firstName} ${session.lastName}\nUsername: ${session.username}\nසනාත කිරීම සඳහා අංක 1 ද , නැවත උත්සහ කිරිමට 2 , එවන්න.`;
+            session.step = "confirmDetails";
+            break;
 
-            case "getLastName":
-                session.lastName = incomingMsg;
-                responseMessage = `Hello, ${session.firstName} ${session.lastName}! 
-                \nPlease Remember ${formatWhatsAppNumber(from)} your WhatsApp number (this will be used as your username and password). \nReply '1' to Continue.`;
-                session.step = "getWhatsAppNumber";
-                break;
-            
-
-            case "getWhatsAppNumber":
-                session.username = formatWhatsAppNumber(from);
-                session.password = incomingMsg;
-                responseMessage = `Confirm your details:\nName: ${session.firstName} ${session.lastName}\nGrade: ${session.grade}\nUsername: ${session.username}\nReply '1' to confirm or '2' to re-enter.`;
-                session.step = "confirmDetails";
-                break;
-
-            case "confirmDetails":
-                if (incomingMsg.toLowerCase() === '1') {
-                    const existingUser = await checkUserInMoodle(session.username);
-                    if (existingUser) {
-                        responseMessage = "You are already registered.";
-                    } else {
-                        const newUser = {
-                            mobileNo: session.username,
-                            firstName: session.firstName,
-                            lastName: session.lastName,
-                            className: "Class X",
-                            grade: session.grade,
-                            phone: session.username,
-                        };
-                        try {
-                            const moodleUser = await syncUserToMoodle(newUser);
-                            const userId = moodleUser.id;
-            
-                            try {
-                                await enrollUserToMoodleCourse(userId, courseID);
-                                responseMessage = `Registration and enrollment successful!\nYou have been enrolled in the course "${session.courseName}".\nDownload the app here: https://shorturl.at/hKmI8. You can now log in to Samanala 🦋 eSchool using your WhatsApp number as username and password.`;
-                                responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
-                            } catch (error) {
-                                responseMessage = `Registration successful!`;
-                            }
-                        } catch (error) {
-                            responseMessage = "An error occurred during registration. Please try again.";
-                        }
-                    }
-                    session.step = "greeting";
+        case "confirmDetails":
+            if (incomingMsg.toLowerCase() === '1') {
+                const existingUser = await checkUserInMoodle(session.username);
+                if (existingUser) {
+                    responseMessage = "You are already registered.";
                 } else {
-                    responseMessage = "Let's start again. What's your first name?";
-                    session.step = "getFirstName";
+                    const newUser = {
+                        mobileNo: session.username,
+                        firstName: session.firstName,
+                        lastName: session.lastName,
+                        className: "Class X",
+                        grade: session.grade,
+                        phone: session.username,
+                    };
+                    try {
+                        const moodleUser = await syncUserToMoodle(newUser);
+                        const userId = moodleUser.id;
+
+                        try {
+                            await enrollUserToMoodleCourse(userId, courseID);
+                            responseMessage = `ඔබගේ ලියාපදින්චිය සාර්තකයි!\nඔබ අපගේ "${session.courseName}" පන්තියට සම්බන්ඳ  වි ඇත.\nDownload the app here: https://shorturl.at/hKmI8. \nඇතුල්විම සඳහා ඔබ අප හා සම්බන්ඳ වූ WhatsApp දුරකථන අංකය username හා password ලෙස භාවිතා කරන්න `;
+                            responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
+                        } catch (error) {
+                            responseMessage = `Registration successful!`;
+                        }
+                    } catch (error) {
+                        responseMessage = "An error occurred during registration. Please try again.";
+                    }
                 }
-                break;
-            
+                session.step = "greeting";
+            } else {
+                responseMessage = "නැවත උත්සහ කරමු. ඔබගේ පළමු නම ( First Name ) එවන්න";
+                session.step = "getFirstName";
+            }
+            break;
+
         default:
             responseMessage = "An error occurred. Please start again.";
             session.step = "greeting";
             break;
     }
+
+    session.conversation.push({ direction: 'outgoing', message: responseMessage });
 
     const messageOptions = {
         body: responseMessage,
@@ -343,15 +339,15 @@ app.post("/whatsapp-webhook", async (req, res) => {
         messageOptions.mediaUrl = responseMedia;
     }
 
-    if (responseMessage) {
-        await logMessage(from, "outgoing", responseMessage);
-    }
-
-
     client.messages
         .create(messageOptions)
         .then((message) => console.log(`Message sent: ${message.sid}`))
         .catch((error) => console.error(error));
+
+    if (session.step === "greeting") {
+        await saveConversation(from, JSON.stringify(session.conversation));
+        delete userSessions[from]; // Clear the session once it's saved
+    }
 
     console.log(`User: ${from}, Message: ${incomingMsg}, Step: ${session.step}`);
     res.status(200).end();
@@ -375,7 +371,6 @@ app.get("/conversation/:userId", async (req, res) => {
         res.status(500).send("Internal Server Error");
     }
 });
-
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
