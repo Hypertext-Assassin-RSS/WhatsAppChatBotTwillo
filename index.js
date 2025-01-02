@@ -270,7 +270,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
                 try {
                     await enrollUserToMoodleCourse(existingUser.id, courseID);
-                    responseMessage = `හමුවිම සතුටක් 😊 ${session.firstName} ${session.lastName}! ඔබගේ අතුලත් වීම සාර්තකයි. /n ඔබ අපගේ "${enrollment.course.course_name}" පන්තියට සම්බන්ඳ  වි ඇත.`;
+                    responseMessage = `හමුවිම සතුටක් 😊 ${session.firstName} ${session.lastName}! ඔබගේ අතුලත් වීම සාර්තකයි. \n ඔබ අපගේ "${enrollment.course.course_name}" පන්තියට සම්බන්ඳ  වි ඇත.`;
                 } catch (error) {
                     responseMessage = `කනගාටුයි ඇතුලත් වීමේ කේතයනැවත එවා උත්සාහ කරන්න!`;
                 }
@@ -280,13 +280,13 @@ app.post("/whatsapp-webhook", async (req, res) => {
                 session.courseName = enrollment.course.course_name;
                 session.grade = enrollment.course.grade;
 
-                responseMessage = `Welcome! සමනල දානුම ආයතනයට සාදරයෙන් පිලිගනිමු 🙏. "${session.courseName}". පාඨමාලාව සඳහා ඔබව අතුලත් කරගනිමු ඔබගේ පළමු නම ( First Name ) එවන්න`;
+                responseMessage = `Welcome! සමනල දැනුම ආයතනයට සාදරයෙන් පිලිගනිමු 🙏. "${session.courseName}". පාඨමාලාව සඳහා ඔබව අතුලත් කරගනිමු ඔබගේ පළමු නම ( First Name ) එවන්න`;
                 session.step = "getFirstName";
             } else if (groupEnrollment.exists) {
                 responseMessage = `Welcome To ${groupEnrollment.course.course_name} Course. Please Use ${groupEnrollment.course.group_link} to join the group.`;
                 session.step = "greeting";
             } else {
-                responseMessage = `ආයුබොවන් 🙏 සමනල දානුම ආයතනය සම්බන්ද කරගැනීම සඳහා  සුසන්ත් මහතා 📞 0770102123 , සශිනි මහත්මිය 📞 0770102123 අමතන්න .`;
+                responseMessage = `ආයුබොවන් 🙏 සමනල දැනුම ආයතනය සම්බන්ද කරගැනීම සඳහා  සුසන්ත් මහතා 📞 0770102123 , සශිනි මහත්මිය 📞 0770102123 අමතන්න .`;
                 session.step = "greeting";
             }
             break;
