@@ -18,7 +18,7 @@ let courseID;
 const userSessions = {};
 
 const pool = new Pool({
-    connectionString:process.env.connectionString
+    connectionString:process.env.CONNECTION_STRING
 });
 
 
@@ -80,6 +80,19 @@ const checkGroupEnrollId = async (enrollId) => {
     }
 };
 
+async function logMessage(userId, direction, message) {
+    const query = `
+        INSERT INTO bot_conversations (user_id, direction, message)
+        VALUES ($1, $2, $3);
+    `;
+    const values = [userId, direction, message];
+    try {
+        await pool.query(query, values);
+    } catch (err) {
+        console.error("Error logging message:", err);
+    }
+}
+
 function formatWhatsAppNumber(input) {
     const match = input.match(/whatsapp:\+94(\d+)/);
     if (match) {
@@ -95,8 +108,6 @@ function getUserSession(from) {
     }
     return userSessions[from];
 }
-
-
 
 // Helper function to add timeout
 function withTimeout(promise, timeoutMs) {
@@ -193,7 +204,7 @@ const enrollUserToMoodleCourse = async (username, courseId) => {
     try {
         const serverUrl = `${moodleUrl}/webservice/rest/server.php?wstoken=${moodleToken}&wsfunction=${functionName}&moodlewsrestformat=${restFormat}`;
         const params = new URLSearchParams();
-        params.append('enrolments[0][roleid]', 5); // Role ID 5 is the default for "Student"
+        params.append('enrolments[0][roleid]', 5);
         params.append('enrolments[0][userid]', username);
         params.append('enrolments[0][courseid]', courseId);
 
@@ -254,12 +265,10 @@ app.post("/whatsapp-webhook", async (req, res) => {
                     session.step = "greeting";
                 }
                 else {
-                    responseMessage = "Enrollment ID not found. Please enter a valid enrollment ID.";
+                    responseMessage = `Hello Welcome To Samanala Danuma eSchool. Are you trying to enroll in a course or join a group? \nplease replay enroll code for course enrollment or '1' for contacting support.`;
                     session.step = "greeting";
                 }
                 break;
-
-
             case "getFirstName":
                 session.firstName = incomingMsg;
                 responseMessage = `Nice to meet you, ${session.firstName}! What's your last name?`;
@@ -305,7 +314,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
                                 responseMessage = `Registration and enrollment successful!\nYou have been enrolled in the course "${session.courseName}".\nDownload the app here: https://samanalaeschool.lk/app. You can now log in to Samanala 🦋 eSchool using your WhatsApp number as username and password.`;
                                 responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
                             } catch (error) {
-                                responseMessage = `Registration successful, but enrollment failed. Please contact support.`;
+                                responseMessage = `Registration successful!`;
                             }
                         } catch (error) {
                             responseMessage = "An error occurred during registration. Please try again.";
@@ -334,6 +343,11 @@ app.post("/whatsapp-webhook", async (req, res) => {
         messageOptions.mediaUrl = responseMedia;
     }
 
+    if (responseMessage) {
+        await logMessage(from, "outgoing", responseMessage);
+    }
+
+
     client.messages
         .create(messageOptions)
         .then((message) => console.log(`Message sent: ${message.sid}`))
@@ -342,6 +356,26 @@ app.post("/whatsapp-webhook", async (req, res) => {
     console.log(`User: ${from}, Message: ${incomingMsg}, Step: ${session.step}`);
     res.status(200).end();
 });
+
+app.get("/conversation/:userId", async (req, res) => {
+    const userId = req.params.userId;
+
+    try {
+        const query = `
+            SELECT * FROM bot_conversations
+            WHERE user_id = $1
+            ORDER BY timestamp;
+        `;
+        const values = [userId];
+        const result = await pool.query(query, values);
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Error fetching conversation history:", err);
+        res.status(500).send("Internal Server Error");
+    }
+});
+
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
