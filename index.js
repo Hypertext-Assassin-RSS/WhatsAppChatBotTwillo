@@ -311,7 +311,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
             
                             try {
                                 await enrollUserToMoodleCourse(userId, courseID);
-                                responseMessage = `Registration and enrollment successful!\nYou have been enrolled in the course "${session.courseName}".\nDownload the app here: https://samanalaeschool.lk/app. You can now log in to Samanala 🦋 eSchool using your WhatsApp number as username and password.`;
+                                responseMessage = `Registration and enrollment successful!\nYou have been enrolled in the course "${session.courseName}".\nDownload the app here: https://shorturl.at/hKmI8. You can now log in to Samanala 🦋 eSchool using your WhatsApp number as username and password.`;
                                 responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
                             } catch (error) {
                                 responseMessage = `Registration successful!`;
