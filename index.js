@@ -18,9 +18,8 @@ let courseID;
 const userSessions = {};
 
 const pool = new Pool({
-    connectionString:process.env.CONNECTION_STRING
+    connectionString: process.env.CONNECTION_STRING
 });
-
 
 (async () => {
     try {
@@ -44,11 +43,9 @@ const checkEnrollId = async (enrollId) => {
 
         if (result.rows.length > 0) {
             console.log('Enroll_id exists:', enrollId);
-
             return { exists: true, course: result.rows[0] };
         } else {
             console.log('Enroll_id does not exist:', enrollId);
-
             return { exists: false };
         }
     } catch (err) {
@@ -67,11 +64,9 @@ const checkGroupEnrollId = async (enrollId) => {
 
         if (result.rows.length > 0) {
             console.log('Group Enroll_id exists:', enrollId);
-
             return { exists: true, course: result.rows[0] };
         } else {
             console.log('Group Enroll_id does not exist:', enrollId);
-
             return { exists: false };
         }
     } catch (err) {
@@ -80,16 +75,16 @@ const checkGroupEnrollId = async (enrollId) => {
     }
 };
 
-async function logMessage(userId, direction, message) {
+async function saveConversation(userId, conversationJson) {
     const query = `
-        INSERT INTO bot_conversations (user_id, direction, message)
-        VALUES ($1, $2, $3);
+        INSERT INTO bot_conversations (user_id, message)
+        VALUES ($1, $2);
     `;
-    const values = [userId, direction, message];
+    const values = [userId, conversationJson];
     try {
         await pool.query(query, values);
     } catch (err) {
-        console.error("Error logging message:", err);
+        console.error("Error saving conversation:", err);
     }
 }
 
@@ -104,7 +99,7 @@ function formatWhatsAppNumber(input) {
 
 function getUserSession(from) {
     if (!userSessions[from]) {
-        userSessions[from] = { step: "greeting" };
+        userSessions[from] = { step: "greeting", conversation: [] };
     }
     return userSessions[from];
 }
@@ -227,11 +222,12 @@ app.post("/whatsapp-webhook", async (req, res) => {
     let enrollment;
     let groupEnrollment;
 
-
     const incomingMsg = req.body?.Body?.trim();
     const from = req.body.From;
 
-    const session = getUserSession(req);
+    const session = getUserSession(from);
+
+    session.conversation.push({ direction: 'incoming', message: incomingMsg });
 
     let responseMessage;
     let responseMedia = null;
@@ -257,7 +253,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
                     await enrollUserToMoodleCourse(existingUser.id, courseID);
                     responseMessage = `හමුවිම සතුටක් 😊 ${session.firstName} ${session.lastName}! ඔබගේ අතුලත් වීම සාර්තකයි. \n ඔබ අපගේ "${enrollment.course.course_name}" පන්තියට සම්බන්ඳ  වි ඇත.`;
                 } catch (error) {
-                    responseMessage = `කනගාටුයි ඇතුලත් වීමේ කේතයනැවත එවා උත්සාහ කරන්න!`;
+                    responseMessage = `කනගාටුයි ඇතුලත් වීමේ කේතය නැවත එවා උත්සාහ කරන්න!`;
                 }
                 session.step = "greeting";
             } else if (enrollment.exists && !existingUser) {
@@ -280,7 +276,6 @@ app.post("/whatsapp-webhook", async (req, res) => {
             responseMessage = `හමුවිම සතුටක් 😊, ${session.firstName} ඔබගේ වාසගම ( Last Name ) එවන්න `;
             session.step = "getWhatsAppNumber";
             break;
-
 
         case "getWhatsAppNumber":
             session.username = formatWhatsAppNumber(from);
@@ -332,6 +327,8 @@ app.post("/whatsapp-webhook", async (req, res) => {
             break;
     }
 
+    session.conversation.push({ direction: 'outgoing', message: responseMessage });
+
     const messageOptions = {
         body: responseMessage,
         from: process.env.TWILIO_WHATSAPP_NUMBER,
@@ -342,14 +339,15 @@ app.post("/whatsapp-webhook", async (req, res) => {
         messageOptions.mediaUrl = responseMedia;
     }
 
-    if (responseMessage) {
-        await logMessage(from, "outgoing", responseMessage);
-    }
-
     client.messages
         .create(messageOptions)
         .then((message) => console.log(`Message sent: ${message.sid}`))
         .catch((error) => console.error(error));
+
+    if (session.step === "greeting") {
+        await saveConversation(from, JSON.stringify(session.conversation));
+        delete userSessions[from]; // Clear the session once it's saved
+    }
 
     console.log(`User: ${from}, Message: ${incomingMsg}, Step: ${session.step}`);
     res.status(200).end();
@@ -373,7 +371,6 @@ app.get("/conversation/:userId", async (req, res) => {
         res.status(500).send("Internal Server Error");
     }
 });
-
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
