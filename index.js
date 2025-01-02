@@ -15,17 +15,12 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const client = twilio(accountSid, authToken);
 let courseID;
 
+const userSessions = {};
+
 const pool = new Pool({
-    connectionString: process.env.CONNECTION_STRING
+    connectionString:process.env.CONNECTION_STRING
 });
 
-
-app.use(session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: true,
-    cookie: { secure: true }
-}));
 
 (async () => {
     try {
@@ -98,20 +93,6 @@ async function logMessage(userId, direction, message) {
     }
 }
 
-async function saveSessionToDatabase(userId, sessionData) {
-    const query = `
-        INSERT INTO bot_conversations (user_id, session_data)
-        VALUES ($1, $2);
-    `;
-    const values = [userId, sessionData];
-    try {
-        await pool.query(query, values);
-        console.log("Session data saved to the database.");
-    } catch (err) {
-        console.error("Error saving session data to the database:", err);
-    }
-}
-
 function formatWhatsAppNumber(input) {
     const match = input.match(/whatsapp:\+94(\d+)/);
     if (match) {
@@ -121,11 +102,11 @@ function formatWhatsAppNumber(input) {
     }
 }
 
-function getUserSession(req) {
-    if (!req.session.user) {
-        req.session.user = { step: "greeting" };
+function getUserSession(from) {
+    if (!userSessions[from]) {
+        userSessions[from] = { step: "greeting" };
     }
-    return req.session.user;
+    return userSessions[from];
 }
 
 // Helper function to add timeout
@@ -339,8 +320,6 @@ app.post("/whatsapp-webhook", async (req, res) => {
                     }
                 }
                 session.step = "greeting";
-
-                await saveSessionToDatabase(from, JSON.stringify(session));
             } else {
                 responseMessage = "නැවත උත්සහ කරමු. ඔබගේ පළමු නම ( First Name ) එවන්න";
                 session.step = "getFirstName";
@@ -394,6 +373,7 @@ app.get("/conversation/:userId", async (req, res) => {
         res.status(500).send("Internal Server Error");
     }
 });
+
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
