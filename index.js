@@ -4,8 +4,6 @@ const twilio = require("twilio");
 const axios = require("axios");
 const { Pool } = require("pg");
 const qs = require('qs');
-const session = require('express-session'); // Import express-session
-const fs = require('fs'); // Import fs module
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -245,6 +243,10 @@ const enrollUserToMoodleCourse = async (username, courseId) => {
 
 // WhatsApp webhook
 app.post("/whatsapp-webhook", async (req, res) => {
+    let enrollment;
+    let groupEnrollment;
+
+
     const incomingMsg = req.body?.Body?.trim();
     const from = req.body.From;
 
@@ -255,8 +257,10 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     switch (session.step) {
         case "greeting":
-            const groupEnrollment = await checkGroupEnrollId(incomingMsg);
-            const enrollment = await checkEnrollId(incomingMsg);
+            if (/^\d{8}$/.test(incomingMsg)) {
+                groupEnrollment = await checkGroupEnrollId(incomingMsg);
+                enrollment = await checkEnrollId(incomingMsg);
+            }
             const existingUser = await checkUserInMoodle(formatWhatsAppNumber(from));
 
             if (enrollment.exists && existingUser) {
@@ -286,7 +290,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
                 responseMessage = `Welcome To ${groupEnrollment.course.course_name} Course. Please Use ${groupEnrollment.course.group_link} to join the group.`;
                 session.step = "greeting";
             } else {
-                responseMessage = `ආයුබොවන් 🙏 සමනල දැනුම ආයතනය සම්බන්ද කරගැනීම සඳහා  සුසන්ත් මහතා 📞 0770102123 , සශිනි මහත්මිය 📞 0770102123 අමතන්න .`;
+                responseMessage = `ආයුබොවන් 🙏 සමනල දැනුම ආයතනය සම්බන්ද කරගැනීම සඳහා \nසුසන්ත මහතා 📞 0768288636 , \nසසිනි මහත්මිය 📞 0760991306 අමතන්න .`;
                 session.step = "greeting";
             }
             break;
