@@ -7,6 +7,7 @@ const { google } = require('googleapis');
 const sheets = google.sheets('v4');
 const { GoogleAuth } = require('google-auth-library');
 
+
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 
@@ -23,13 +24,12 @@ const pool = new Pool({
     connectionString: process.env.CONNECTION_STRING
 });
 
-
 const auth = new GoogleAuth({
     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
 });
 
 const SPREADSHEET_ID = '1ZHBwc-T3HSbuVDoBz05ACV7UQeAm5YuHrRYyXxUyNcY';
-const RANGE = 'Sheet1!A:B';
+const RANGE = 'Sheet1!A:I';
 
 (async () => {
     try {
@@ -68,32 +68,29 @@ const checkGroupEnrollId = async (enrollId) => {
     console.log('Checking group enroll_id:', enrollId);
 
     try {
-        // Authenticate and create the client
+
         const authClient = await auth.getClient();
         google.options({ auth: authClient });
 
-        // Fetch the data from the Google Sheet
         const response = await sheets.spreadsheets.values.get({
             spreadsheetId: SPREADSHEET_ID,
             range: RANGE,
         });
 
-        // Parse the data
         const rows = response.data.values;
-        if (rows.length === 0) {
+        if (!rows || rows.length === 0) {
             console.log('No data found in the Google Sheet.');
             return { exists: false };
         }
 
-        // Check if the enroll ID exists in the sheet
-        for (const row of rows) {
+        for (const row of rows) { 
             if (row[0] === enrollId) {
-                const groupLink = row[1];
+                const courseName = row[1];
+                const groupLink = row[8];
                 console.log('Group Enroll_id exists:', enrollId);
-                return { exists: true, groupLink: groupLink };
+                return { exists: true, course: { course_name: courseName, group_link: groupLink } };
             }
         }
-
         console.log('Group Enroll_id does not exist:', enrollId);
         return { exists: false };
     } catch (err) {
@@ -101,6 +98,7 @@ const checkGroupEnrollId = async (enrollId) => {
         throw err;
     }
 };
+
 async function saveConversation(userId, conversationJson) {
     const query = `
         INSERT INTO bot_conversations (user_id, message, timestamp)
@@ -113,7 +111,6 @@ async function saveConversation(userId, conversationJson) {
         console.error("Error saving conversation:", err);
     }
 }
-
 
 function formatWhatsAppNumber(input) {
     const match = input.match(/whatsapp:\+94(\d+)/);
@@ -262,12 +259,12 @@ app.post("/whatsapp-webhook", async (req, res) => {
     switch (session.step) {
         case "greeting":
             if (/^\d{8}$/.test(incomingMsg)) {
-                groupEnrollment = await checkGroupEnrollId(incomingMsg);
                 enrollment = await checkEnrollId(incomingMsg);
             } else {
                 responseMessage = `ආයුබොවන් 🙏 සමනල දැනුම ආයතනය සම්බන්ද කරගැනීම සඳහා \nසුසන්ත මහතා 📞 0768288636 , \nසසිනි මහත්මිය 📞 0760991306 අමතන්න .`;
                 session.step = "greeting";
             }
+            groupEnrollment = await checkGroupEnrollId(incomingMsg);
             const existingUser = await checkUserInMoodle(formatWhatsAppNumber(from));
 
             if (enrollment?.exists && existingUser) {
