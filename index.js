@@ -77,8 +77,8 @@ const checkGroupEnrollId = async (enrollId) => {
 
 async function saveConversation(userId, conversationJson) {
     const query = `
-        INSERT INTO bot_conversations (user_id, message)
-        VALUES ($1, $2);
+        INSERT INTO bot_conversations (user_id, message, timestamp)
+        VALUES ($1, $2, now() AT TIME ZONE 'Asia/Colombo');
     `;
     const values = [userId, conversationJson];
     try {
@@ -87,6 +87,7 @@ async function saveConversation(userId, conversationJson) {
         console.error("Error saving conversation:", err);
     }
 }
+
 
 function formatWhatsAppNumber(input) {
     const match = input.match(/whatsapp:\+94(\d+)/);
@@ -237,10 +238,13 @@ app.post("/whatsapp-webhook", async (req, res) => {
             if (/^\d{8}$/.test(incomingMsg)) {
                 groupEnrollment = await checkGroupEnrollId(incomingMsg);
                 enrollment = await checkEnrollId(incomingMsg);
+            } else {
+                responseMessage = `ආයුබොවන් 🙏 සමනල දැනුම ආයතනය සම්බන්ද කරගැනීම සඳහා \nසුසන්ත මහතා 📞 0768288636 , \nසසිනි මහත්මිය 📞 0760991306 අමතන්න .`;
+                session.step = "greeting";
             }
             const existingUser = await checkUserInMoodle(formatWhatsAppNumber(from));
 
-            if (enrollment.exists && existingUser) {
+            if (enrollment?.exists && existingUser) {
                 session.firstName = existingUser.firstname;
                 session.lastName = existingUser.lastname;
                 session.username = existingUser.username;
@@ -256,14 +260,14 @@ app.post("/whatsapp-webhook", async (req, res) => {
                     responseMessage = `කනගාටුයි ඇතුලත් වීමේ කේතය නැවත එවා උත්සාහ කරන්න!`;
                 }
                 session.step = "greeting";
-            } else if (enrollment.exists && !existingUser) {
+            } else if (enrollment?.exists && !existingUser) {
                 courseID = enrollment.course.course_id;
                 session.courseName = enrollment.course.course_name;
                 session.grade = enrollment.course.grade;
 
                 responseMessage = `Welcome! සමනල දැනුම ආයතනයට සාදරයෙන් පිලිගනිමු 🙏. "${session.courseName}". පාඨමාලාව සඳහා ඔබව ඇතුලත් කරගනිමු ඔබගේ පළමු නම ( First Name ) එවන්න`;
                 session.step = "getFirstName";
-            } else if (groupEnrollment.exists) {
+            } else if (groupEnrollment?.exists) {
                 responseMessage = `Welcome To ${groupEnrollment.course.course_name} Course. Please Use ${groupEnrollment.course.group_link} to join the group.`;
                 session.step = "greeting";
             } else {
@@ -281,7 +285,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
             session.username = formatWhatsAppNumber(from);
             session.password = formatWhatsAppNumber(from);
             session.lastName = incomingMsg;
-            responseMessage = `කරුනාකර ඔබගේ තොරතුරු තහවුරු කරගන්න .:\n නම: ${session.firstName} ${session.lastName}\nUsername: ${session.username}\nසනාත කිරීම සඳහා අංක 1 ද , නැවත උත්සහ කිරිමට 2 , එවන්න.`;
+            responseMessage = `කරුනාකර ඔබගේ තොරතුරු තහවුරු කරගන්න :\nනම: ${session.firstName} ${session.lastName}\nUsername: ${session.username}\nසනාත කිරීම සඳහා අංක 1 ද , නැවත උත්සහ කිරිමට 2 , එවන්න.`;
             session.step = "confirmDetails";
             break;
 
@@ -348,7 +352,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     if (session.step === "greeting") {
         await saveConversation(from, JSON.stringify(session.conversation));
-        delete userSessions[from]; // Clear the session once it's saved
+        delete userSessions[from];
     }
 
     console.log(`User: ${from}, Message: ${incomingMsg}, Step: ${session.step}`);
