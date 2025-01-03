@@ -278,7 +278,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
                 try {
                     await enrollUserToMoodleCourse(existingUser.id, courseID);
-                    responseMessage = `හමුවිම සතුටක් 😊 ${session.firstName} ${session.lastName}! ඔබගේ ඇතුලත් වීම සාර්තකයි. \n ඔබ අපගේ "${enrollment.course.course_name}" පන්තියට සම්බන්ඳ  වි ඇත.`;
+                    responseMessage = `${session.firstName} ${session.lastName}! ඔබගේ ඇතුලත් වීම සාර්තකයි. \n ඔබ අපගේ "${enrollment.course.course_name}" පාඨමාලාව සම්බන්ඳ  වි ඇත.`;
                 } catch (error) {
                     responseMessage = `කනගාටුයි ඇතුලත් වීමේ කේතය නැවත එවා උත්සාහ කරන්න!`;
                 }
@@ -294,7 +294,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
                 responseMessage = `Welcome To ${groupEnrollment.course.course_name} Course. Please Use ${groupEnrollment.course.group_link} to join the group.`;
                 session.step = "greeting";
             } else {
-                responseMessage = `ආයුබොවන් 🙏 සමනල දැනුම ආයතනය සම්බන්ද කරගැනීම සඳහා \nසුසන්ත මහතා 📞 0768288636 , \nසසිනි මහත්මිය 📞 0760991306 අමතන්න .`;
+                responseMessage = `ආයුබොවන් 🙏 සමනල දැනුම ආයතනය සම්බන්ඳ කරගැනීම සඳහා \nසුසන්ත මහතා 📞 0768288636 , \nසසිනි මහත්මිය 📞 0760991306 අමතන්න .`;
                 session.step = "greeting";
             }
             break;
