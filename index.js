@@ -18,6 +18,10 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const client = twilio(accountSid, authToken);
 let courseID;
 
+const MAX_CONCURRENT_REGISTRATIONS = 20;
+let registrationQueue = [];
+let currentRegistrations = 0;
+
 const userSessions = {};
 
 const pool = new Pool({
@@ -256,6 +260,22 @@ app.post("/whatsapp-webhook", async (req, res) => {
     let responseMessage;
     let responseMedia = null;
 
+    if (currentRegistrations >= MAX_CONCURRENT_REGISTRATIONS) {
+        registrationQueue.push({ from, incomingMsg });
+        responseMessage = "The system is currently busy. You have been added to the queue. Please wait...";
+        client.messages.create({
+            body: responseMessage,
+            from: process.env.TWILIO_WHATSAPP_NUMBER,
+            to: from
+        }).then((message) => console.log(`Message sent: ${message.sid}`))
+          .catch((error) => console.error(error));
+        return res.status(200).end();
+    }
+
+
+    currentRegistrations++;
+
+
     switch (session.step) {
         case "greeting":
             if (/^\d{8}$/.test(incomingMsg)) {
@@ -273,8 +293,6 @@ app.post("/whatsapp-webhook", async (req, res) => {
                 session.username = existingUser.username;
 
                 courseID = enrollment.course.course_id;
-
-                console.log('LMS Course ID: ', courseID);
 
                 try {
                     await enrollUserToMoodleCourse(existingUser.id, courseID);
@@ -389,11 +407,35 @@ app.post("/whatsapp-webhook", async (req, res) => {
     if (session.step === "greeting") {
         await saveConversation(from, JSON.stringify(session.conversation));
         delete userSessions[from];
+
+        currentRegistrations--;
+        processQueue();
     }
 
     console.log(`User: ${from}, Message: ${incomingMsg}, Step: ${session.step}`);
     res.status(200).end();
 });
+
+function processQueue() {
+    if (currentRegistrations < MAX_CONCURRENT_REGISTRATIONS && registrationQueue.length > 0) {
+        const nextUser = registrationQueue.shift();
+        if (nextUser) {
+            const req = {
+                body: {
+                    Body: nextUser.incomingMsg,
+                    From: nextUser.from
+                }
+            };
+            const res = {
+                status: (statusCode) => ({
+                    end: () => {}
+                }),
+                send: () => {}
+            };
+            app._router.handle(req, res, () => {});
+        }
+    }
+}
 
 app.get("/conversation/:userId", async (req, res) => {
     const userId = req.params.userId;
