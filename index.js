@@ -300,20 +300,30 @@ app.post("/whatsapp-webhook", async (req, res) => {
             break;
         case "getFirstName":
             session.firstName = incomingMsg;
-            responseMessage = `${session.firstName} ඔබගේ වාසගම ( Last Name ) ලබාදෙන්න.`;
-            session.step = "getWhatsAppNumber";
+            if (incomingMsg.length <= 3 && /^[A-Za-z]+$/.test(incomingMsg)) {
+                responseMessage = "කරුණාකර ඔබගේ පළමු නම ( First Name ) ලබාදෙන්න.";
+                session.step = "getFirstName";
+            } else {
+                responseMessage = `${session.firstName} ඔබගේ වාසගම ( Last Name ) ලබාදෙන්න.`;
+                session.step = "getLastName";
+            }
             break;
-
-        case "getWhatsAppNumber":
+        case "getLastName":
             session.username = formatWhatsAppNumber(from);
             session.password = formatWhatsAppNumber(from);
             session.lastName = incomingMsg;
-            responseMessage = `කරුණාකර ඔබගේ තොරතුරු තහවුරු කරගන්න :\nනම: ${session.firstName} ${session.lastName}\nUsername: ${session.username}\nසනාථ් කිරීම සඳහා අංක 1 ද , නැවත උත්සාහ කිරිමට අංක 2 , ලබාදෙන්න.`;
-            session.step = "confirmDetails";
+
+            if (incomingMsg.length <= 3 && /^[A-Za-z]+$/.test(incomingMsg)) {
+                responseMessage = "කරුණාකර ඔබගේ ඔබගේ වාසගම ( Last Name ) ලබාදෙන්න.";
+                session.step = "getLastName";
+            } else {
+                responseMessage = `කරුණාකර ඔබගේ තොරතුරු තහවුරු කරගන්න :\nනම: ${session.firstName} ${session.lastName}\nUsername: ${session.username}\nසනාථ් කිරීම සඳහා අංක 1 ද , නැවත උත්සාහ කිරිමට අංක 2 , ලබාදෙන්න.`;
+                session.step = "confirmDetails";
+            }
             break;
 
         case "confirmDetails":
-            if (incomingMsg.toLowerCase() === '1') {
+            if (incomingMsg.toLowerCase() === '1' && incomingMsg === '1') {
                 const existingUser = await checkUserInMoodle(session.username);
                 if (existingUser) {
                     responseMessage = "You are already registered.";
@@ -344,9 +354,12 @@ app.post("/whatsapp-webhook", async (req, res) => {
                     }
                 }
                 session.step = "greeting";
-            } else {
-                responseMessage = "නැවත උත්සහ කරමු. ඔබගේ පළමු නම ( First Name ) ලබාදෙන්න";
+            } else if (incomingMsg.toLowerCase() === '2' && incomingMsg === '2') {
+                responseMessage = "නැවත උත්සහ කරමු. ඔබගේ පළමු නම ( First Name ) ලබාදෙන්න.";
                 session.step = "getFirstName";
+            } else {
+                responseMessage = `ලබාදුන් පිළිතුර වැරදි නැවත උත්සහ කරන්න. \nකරුණාකර ඔබගේ තොරතුරු තහවුරු කරගන්න :\nනම: ${session.firstName} ${session.lastName}\nUsername: ${session.username}\nසනාථ් කිරීම සඳහා අංක 1 ද , නැවත උත්සාහ කිරිමට අංක 2 , ලබාදෙන්න.`;
+                session.step = "confirmDetails";
             }
             break;
 
