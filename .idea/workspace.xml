@@ -5,7 +5,6 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c5e412c1-bb77-4d52-b736-ac6c05c4db93" name="Changes" comment="add sinhala lang">
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/index.js" afterDir="false" />
     </list>
@@ -81,6 +80,8 @@
       <workItem from="1735800978548" duration="3112000" />
       <workItem from="1735885332102" duration="1959000" />
       <workItem from="1736853502758" duration="1670000" />
+      <workItem from="1736934138509" duration="12000" />
+      <workItem from="1736935837714" duration="287000" />
     </task>
     <task id="LOCAL-00001" summary="add sinhala lang">
       <option name="closed" value="true" />

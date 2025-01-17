@@ -86,7 +86,7 @@ const checkGroupEnrollId = async (enrollId) => {
         for (const row of rows) { 
             if (row[0] === enrollId) {
                 const courseName = row[1];
-                const groupLink = row[8];
+                const groupLink = row[7];
                 console.log('Group Enroll_id exists:', enrollId);
                 return { exists: true, course: { course_name: courseName, group_link: groupLink } };
             }
@@ -233,7 +233,7 @@ const enrollUserToMoodleCourse = async (username, courseId) => {
             },
         });
 
-        console.log('User enrolled in course:', response.data);
+        console.log('User enrolled in course:',courseId);
         return true;
     } catch (err) {
         console.error('Error enrolling user in Moodle course:', err.response?.data || err);
@@ -349,7 +349,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
                             await enrollUserToMoodleCourse(userId, courseID);
                             responseMessage = `ඔබගේ ලියාපදිංචිය සාර්ථකයි!\nඔබ අපගේ "${session.courseName}" පාඨමාලාවට සම්බන්ධ  වි ඇත.\nDownload the app here: https://shorturl.at/hKmI8. \nඇතුල්විම සඳහා ඔබ අප හා සම්බන්ධ වූ ${session.username} දුරකථන අංකය username හා password ලෙස භාවිත කරන්න \n \n \n \n \t \t
                             මෙම e පාසලෙන් ලැබෙන සියලු දැනුම ලබා ගැනීමට ඔබ තවමත් "${session.courseName}" මිල දී ගෙන නැති නම් දැන්ම ඔබගේ ළඟම ඇති අලෙවි නියොජිතගෙන් හෝ පොත් හලෙන්  මිල දී ගන්න නැතහොත් \n  විස්තර දැනගැනීම සඳහා 📞 0768288636 , \n තාක්ෂණික සහය සඳහා 📞0760991306 අමතන්න.`;
-                            responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
+                            // responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
                         } catch (error) {
                             responseMessage = `Registration successful!`;
                         }
