@@ -3,7 +3,10 @@ const bodyParser = require("body-parser");
 const twilio = require("twilio");
 const axios = require("axios");
 const { Pool } = require("pg");
-const qs = require('qs');
+const { google } = require('googleapis');
+const sheets = google.sheets('v4');
+const { GoogleAuth } = require('google-auth-library');
+
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -20,6 +23,13 @@ const userSessions = {};
 const pool = new Pool({
     connectionString: process.env.CONNECTION_STRING
 });
+
+const auth = new GoogleAuth({
+    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
+});
+
+const SPREADSHEET_ID = '1ZHBwc-T3HSbuVDoBz05ACV7UQeAm5YuHrRYyXxUyNcY';
+const RANGE = 'Sheet1!A:I';
 
 (async () => {
     try {
@@ -58,19 +68,33 @@ const checkGroupEnrollId = async (enrollId) => {
     console.log('Checking group enroll_id:', enrollId);
 
     try {
-        const query = `SELECT * FROM public.groups WHERE enroll_id = $1;`;
-        const values = [enrollId];
-        const result = await pool.query(query, values);
 
-        if (result.rows.length > 0) {
-            console.log('Group Enroll_id exists:', enrollId);
-            return { exists: true, course: result.rows[0] };
-        } else {
-            console.log('Group Enroll_id does not exist:', enrollId);
+        const authClient = await auth.getClient();
+        google.options({ auth: authClient });
+
+        const response = await sheets.spreadsheets.values.get({
+            spreadsheetId: SPREADSHEET_ID,
+            range: RANGE,
+        });
+
+        const rows = response.data.values;
+        if (!rows || rows.length === 0) {
+            console.log('No data found in the Google Sheet.');
             return { exists: false };
         }
+
+        for (const row of rows) { 
+            if (row[0] === enrollId) {
+                const courseName = row[1];
+                const groupLink = row[7];
+                console.log('Group Enroll_id exists:', enrollId);
+                return { exists: true, course: { course_name: courseName, group_link: groupLink } };
+            }
+        }
+        console.log('Group Enroll_id does not exist:', enrollId);
+        return { exists: false };
     } catch (err) {
-        console.error("Error checking enroll_id:", err);
+        console.error("Error checking enroll_id in Google Sheet:", err);
         throw err;
     }
 };
@@ -87,7 +111,6 @@ async function saveConversation(userId, conversationJson) {
         console.error("Error saving conversation:", err);
     }
 }
-
 
 function formatWhatsAppNumber(input) {
     const match = input.match(/whatsapp:\+94(\d+)/);
@@ -210,7 +233,7 @@ const enrollUserToMoodleCourse = async (username, courseId) => {
             },
         });
 
-        console.log('User enrolled in course:', response.data);
+        console.log('User enrolled in course:',courseId);
         return true;
     } catch (err) {
         console.error('Error enrolling user in Moodle course:', err.response?.data || err);
@@ -218,12 +241,33 @@ const enrollUserToMoodleCourse = async (username, courseId) => {
     }
 };
 
+
+const sendDelayedMessage = (to, message, delay) => {
+    setTimeout(() => {
+        client.messages
+            .create({
+                body: message,
+                from: process.env.TWILIO_WHATSAPP_NUMBER,
+                to: to,
+                mediaUrl : ['https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202025-01-17%20at%2009.32.20_5f09545c.jpg']
+                
+            })
+            .then((message) => console.log(`Delayed message sent: ${message.sid}`))
+            .catch((error) => console.error(error));
+    }, delay);
+};
+
 // WhatsApp webhook
 app.post("/whatsapp-webhook", async (req, res) => {
     let enrollment;
     let groupEnrollment;
 
-    const incomingMsg = req.body?.Body?.trim();
+    let trimmedMsg = req.body?.Body?.trim();
+
+    const incomingMsg = trimmedMsg.replace(/[^a-zA-Z0-9]/g, '');
+
+    console.log("Incoming message:", incomingMsg);
+
     const from = req.body.From;
 
     const session = getUserSession(from);
@@ -255,7 +299,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
                 try {
                     await enrollUserToMoodleCourse(existingUser.id, courseID);
-                    responseMessage = `${session.firstName} ${session.lastName}! ඔබගේ ඇතුලත් වීම සාර්තකයි. \n ඔබ අපගේ "${enrollment.course.course_name}" පාඨමාලාව සම්බන්ඳ  වි ඇත.`;
+                    responseMessage = `${session.firstName} ${session.lastName}! ඔබගේ ඇතුලත් වීම සාර්තකයි. \n ඔබ අපගේ "${enrollment.course.course_name}"පාඨමාලාව සම්බන්ඳ වි ඇත.\nඇතුල්විම සඳහා ඔබ අප හා සම්බන්ධ වූ ${session.username} දුරකථන අංකය username හා password ලෙස භාවිත කරන්න.`;
                 } catch (error) {
                     responseMessage = `කනගාටුයි ඇතුලත් වීමේ කේතය නැවත එවා උත්සාහ කරන්න!`;
                 }
@@ -294,7 +338,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
                 responseMessage = "කරුණාකර ඔබගේ ඔබගේ වාසගම ( Last Name ) ලබාදෙන්න.";
                 session.step = "getLastName";
             } else {
-                responseMessage = `කරුණාකර ඔබගේ තොරතුරු තහවුරු කරගන්න :\nනම: ${session.firstName} ${session.lastName}\nUsername: ${session.username}\nසනාථ් කිරීම සඳහා අංක 1 ද , නැවත උත්සාහ කිරිමට අංක 2 , ලබාදෙන්න.`;
+                responseMessage = `කරුණාකර ඔබගේ තොරතුරු තහවුරු කරගන්න :\nනම: ${session.firstName} ${session.lastName}\nUsername: ${session.username}\nසනාථ කිරීම සඳහා අංක 1 ද , නැවත උත්සාහ කිරිමට අංක 2 , ලබාදෙන්න.`;
                 session.step = "confirmDetails";
             }
             break;
@@ -318,11 +362,14 @@ app.post("/whatsapp-webhook", async (req, res) => {
                         const userId = moodleUser.id;
 
                         try {
-                            await enrollUserToMoodleCourse(userId, courseID);
-                            responseMessage = `ඔබගේ ලියාපදිංචිය සාර්ථකයි!\nඔබ අපගේ "${session.courseName}" පාඨමාලාවට සම්බන්ධ  වි ඇත.\nDownload the app here: https://shorturl.at/hKmI8. \nඇතුල්විම සඳහා ඔබ අප හා සම්බන්ධ වූ WhatsApp දුරකථන අංකය username හා password ලෙස භාවිත කරන්න \n \n \n \n
-                            මෙම e පාසලෙන් ලැබෙන සියලු දැනුම ලබා ගැනීමට ඔබ තවමත් "${session.courseName}" මිල දී ගෙන නැති නම් දැන්ම ඔබගේ ළඟම ඇති අලෙවි නියොජිතගෙන් හෝ පොත් හලෙන්  මිල දී ගන්න නැතහොත් \n  විස්තර දැනගැනීම සඳහා 📞 0768288636 , \n තාක්ෂණික සහය සඳහා 📞0760991306 අමතන්න.
-                            `;
-                            responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
+                            let  status = await enrollUserToMoodleCourse(userId, courseID);
+                            console.log('User enrolled in course:', status);
+                            responseMessage = `ඔබගේ ලියාපදිංචිය සාර්ථකයි!\nඔබ අපගේ "${session.courseName}" පාඨමාලාවට සම්බන්ධ  වි ඇත.\n ඇතුල්විම සඳහා ඔබ අප හා සම්බන්ධ වූ '${session.username}'  දුරකථන අංකය username හා password ලෙස භාවිත කරන්න \nDownload the app here: https://shorturl.at/hKmI8.`;
+                            // responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
+
+                             const delayedMessage = `මෙම e පාසලෙන් ලැබෙන සියලු දැනුම ලබා ගැනීමට ඔබ තවමත් "${session.courseName}" මිල දී ගෙන නැති නම් දැන්ම ඔබගේ ළඟම ඇති අලෙවි නියොජිතගෙන් හෝ පොත් හලෙන්  මිල දී ගන්න නැතහොත් \n  විස්තර දැනගැනීම සඳහා 📞 0768288636 , \n තාක්ෂණික සහය සඳහා 📞0760991306 අමතන්න.`;
+                             sendDelayedMessage(from, delayedMessage, 10 * 1000);
+ 
                         } catch (error) {
                             responseMessage = `Registration successful!`;
                         }

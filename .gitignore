@@ -129,5 +129,5 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-# Google Cloud SDK credentials
+# Google Cloud Platform Credentials
 google-credentials.json
