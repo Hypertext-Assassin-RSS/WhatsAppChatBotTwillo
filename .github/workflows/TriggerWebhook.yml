@@ -1,7 +1,7 @@
 name: Trigger Webhook on Release Branch Update
 
 on:
-  push:
+  pull_request:
     branches:
       - release
 
