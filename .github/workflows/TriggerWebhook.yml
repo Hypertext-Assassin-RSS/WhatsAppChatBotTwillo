@@ -1,0 +1,19 @@
+name: Trigger Webhook on Release Branch Update
+
+on:
+  push:
+    branches:
+      - release
+
+jobs:
+  call-webhook:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Send the webhook payload
+      - name: Call Deployment Webhook
+        run: |
+          curl -X POST \
+          -H "Content-Type: application/json" \
+          -d '{"action": "push", "ref": "refs/heads/release"}' \
+          http://13.251.18.154:9000/hooks/deploy-container
