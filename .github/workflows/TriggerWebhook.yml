@@ -2,8 +2,7 @@ name: Trigger Webhook on Release Branch Update
 
 on:
   pull_request:
-    branches:
-      - release
+    branches: [ "release" ]
 
 jobs:
   call-webhook:
