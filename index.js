@@ -468,7 +468,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     if (session.step === "greeting") {
         await saveConversation(from, JSON.stringify(session.conversation));
-        await saveConversationToExel(from, JSON.stringify(session.conversation));
+        // await saveConversationToExel(from, JSON.stringify(session.conversation));
         delete userSessions[from];
     }
 
