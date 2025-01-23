@@ -35,7 +35,7 @@ jobs:
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key
           chmod 600 private_key
-          ssh -i private_key -o StrictHostKeyChecking=no user@your-server-ip << 'EOF'
+          ssh -i private_key -o StrictHostKeyChecking=no ubuntu@13.251.18.154 << 'EOF'
             docker stop your-container-name || true
             docker rm your-container-name || true
             docker rmi ghcr.io/hypertext-assassin-rss/twilio-whatsapp:latest || true
