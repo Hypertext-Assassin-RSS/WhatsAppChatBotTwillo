@@ -12,6 +12,25 @@ WORKDIR /app
 # Set production environment
 ENV NODE_ENV="production"
 
+# Define build arguments for environment variables
+ARG SESSION_SECRET
+ARG TWILIO_ACCOUNT_SID
+ARG TWILIO_AUTH_TOKEN
+ARG TWILIO_WHATSAPP_NUMBER
+ARG MOODLE_URL
+ARG MOODLE_TOKEN
+ARG CONNECTION_STRING
+ARG PORT
+
+# Set environment variables from build arguments
+ENV SESSION_SECRET=${SESSION_SECRET}
+ENV TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+ENV TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+ENV TWILIO_WHATSAPP_NUMBER=${TWILIO_WHATSAPP_NUMBER}
+ENV MOODLE_URL=${MOODLE_URL}
+ENV MOODLE_TOKEN=${MOODLE_TOKEN}
+ENV CONNECTION_STRING=${CONNECTION_STRING}
+ENV PORT=${PORT}
 
 # Throw-away build stage to reduce size of final image
 FROM base as build
@@ -27,7 +46,6 @@ RUN npm ci
 # Copy application code
 COPY . .
 
-
 # Final stage for app image
 FROM base
 
@@ -35,5 +53,5 @@ FROM base
 COPY --from=build /app /app
 
 # Start the server by default, this can be overwritten at runtime
-EXPOSE 3001
+EXPOSE ${PORT}
 CMD [ "node", "index.js" ]
