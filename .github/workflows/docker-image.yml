@@ -77,7 +77,7 @@ jobs:
           SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key
-          chmod 600 private_key
+          chmod 600 private_key  
           ssh -i private_key -o StrictHostKeyChecking=no ubuntu@13.251.18.154 << 'EOF'
             docker pull ghcr.io/hypertext-assassin-rss/twilio-whatsapp:latest
             docker run -d --name your-container-name -p 80:80 ghcr.io/hypertext-assassin-rss/twilio-whatsapp:latest
