@@ -37,7 +37,7 @@ jobs:
           chmod 600 private_key
           ssh -i private_key -o StrictHostKeyChecking=no ubuntu@13.251.18.154 << 'EOF'
             docker stop your-container-name || true
-            docker rm your-container-name || true
+            docker rm whatsappbot-container || true
             docker rmi ghcr.io/hypertext-assassin-rss/twilio-whatsapp:latest || true
           EOF
         shell: bash
@@ -80,6 +80,6 @@ jobs:
           chmod 600 private_key  
           ssh -i private_key -o StrictHostKeyChecking=no ubuntu@13.251.18.154 << 'EOF'
             docker pull ghcr.io/hypertext-assassin-rss/twilio-whatsapp:latest
-            docker run -d --name your-container-name -p 80:80 ghcr.io/hypertext-assassin-rss/twilio-whatsapp:latest
+            docker run -d --name whatsappbot-container -p 3001:3001 ghcr.io/hypertext-assassin-rss/twilio-whatsapp:latest
           EOF
         shell: bash
