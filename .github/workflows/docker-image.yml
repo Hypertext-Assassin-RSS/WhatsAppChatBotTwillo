@@ -16,9 +16,45 @@ jobs:
       - name: Log in to GitHub Container Registry
         run: echo "${{ secrets.GH_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      # Build the Docker image
+      # Check environment variables
+      - name: Check Environment Variables
+        run: |
+          echo "TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}"
+          echo "TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}"
+          echo "TWILIO_WHATSAPP_NUMBER: ${{ secrets.TWILIO_WHATSAPP_NUMBER }}"
+          echo "MOODLE_URL: ${{ secrets.MOODLE_URL }}"
+          echo "MOODLE_TOKEN: ${{ secrets.MOODLE_TOKEN }}"
+          echo "CONNECTION_STRING: ${{ secrets.CONNECTION_STRING }}"
+          echo "PORT: ${{ secrets.PORT }}"
+
+      # Remove existing Docker container and image on server
+      - name: Remove existing Docker container and image on server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > private_key
+          chmod 600 private_key
+          ssh -i private_key -o StrictHostKeyChecking=no ubuntu@13.251.18.154 << 'EOF'
+            docker stop your-container-name || true
+            docker rm whatsappbot-container || true
+            docker rmi ghcr.io/hypertext-assassin-rss/twilio-whatsapp:latest || true
+          EOF
+        shell: bash
+
+      # Build the Docker image with secrets passed as build arguments
       - name: Build the Docker image
-        run: docker build . --file Dockerfile --tag twilio-whatsapp
+        run: |
+          docker build . \
+          --file Dockerfile \
+          --tag twilio-whatsapp \
+          --build-arg TWILIO_ACCOUNT_SID=${{ secrets.TWILIO_ACCOUNT_SID }} \
+          --build-arg TWILIO_AUTH_TOKEN=${{ secrets.TWILIO_AUTH_TOKEN }} \
+          --build-arg TWILIO_WHATSAPP_NUMBER=${{ secrets.TWILIO_WHATSAPP_NUMBER }} \
+          --build-arg MOODLE_URL=${{ secrets.MOODLE_URL }} \
+          --build-arg MOODLE_TOKEN=${{ secrets.MOODLE_TOKEN }} \
+          --build-arg CONNECTION_STRING=${{ secrets.CONNECTION_STRING }} \
+          --build-arg PORT=${{ secrets.PORT }}
 
       # Tag the Docker image
       - name: Tag the Docker image
@@ -33,3 +69,17 @@ jobs:
 
       - name: Push the Docker image
         run: docker push ghcr.io/samanala-tech/twilio-whatsapp:latest
+
+      # Update Docker container on server
+      - name: Update Docker container on server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          echo "$SSH_PRIVATE_KEY" > private_key
+          chmod 600 private_key  
+          ssh -i private_key -o StrictHostKeyChecking=no ubuntu@13.251.18.154 << 'EOF'
+            docker pull ghcr.io/hypertext-assassin-rss/twilio-whatsapp:latest
+            docker run -d --name whatsappbot-container -p 3001:3001 ghcr.io/hypertext-assassin-rss/twilio-whatsapp:latest
+          EOF
+        shell: bash
