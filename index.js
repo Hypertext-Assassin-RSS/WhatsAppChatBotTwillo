@@ -25,10 +25,11 @@ const pool = new Pool({
 });
 
 const auth = new GoogleAuth({
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
+    scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
 
 const SPREADSHEET_ID = '1ZHBwc-T3HSbuVDoBz05ACV7UQeAm5YuHrRYyXxUyNcY';
+const SPREADSHEET_ID_WRITABLE = '1kgKVpRp1ge1jqKFSnUSc2-dB9shY9ENoW4fjNsMAidc';
 const RANGE = 'Sheet1!A:I';
 
 (async () => {
@@ -93,6 +94,38 @@ const checkGroupEnrollId = async (enrollId) => {
         }
         console.log('Group Enroll_id does not exist:', enrollId);
         return { exists: false };
+    } catch (err) {
+        console.error("Error checking enroll_id in Google Sheet:", err);
+        throw err;
+    }
+};
+
+
+const saveConversationToExel = async (userId, conversationJson) => {
+    console.log('Saving conversation to Google Sheet:', conversationJson);
+
+    try {
+
+        const authClient = await auth.getClient();
+        google.options({ auth: authClient });
+
+        const values = [
+            [userId, conversationJson, new Date().toISOString()]
+        ];
+
+        const resource = {
+            values,
+        };
+
+        const result = await sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID_WRITABLE,
+            range: RANGE,
+            valueInputOption: 'RAW',
+            resource,
+        });
+
+        console.log(`${result.data.updates.updatedCells} cells appended.`);
+        return true;
     } catch (err) {
         console.error("Error checking enroll_id in Google Sheet:", err);
         throw err;
@@ -257,6 +290,27 @@ const sendDelayedMessage = (to, message, delay) => {
     }, delay);
 };
 
+const enrollmentLock = {};
+
+const acquireLock = (from) => {
+    return new Promise((resolve, reject) => {
+        const checkLock = () => {
+            if (!enrollmentLock[from]) {
+                enrollmentLock[from] = true;
+                resolve();
+            } else {
+                setTimeout(checkLock, 100);
+            }
+        };
+        checkLock();
+    });
+};
+
+const releaseLock = (from) => {
+    delete enrollmentLock[from];
+};
+
+
 // WhatsApp webhook
 app.post("/whatsapp-webhook", async (req, res) => {
     let enrollment;
@@ -276,6 +330,8 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     let responseMessage;
     let responseMedia = null;
+
+    await acquireLock(from);
 
     switch (session.step) {
         case "greeting":
@@ -412,12 +468,18 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     if (session.step === "greeting") {
         await saveConversation(from, JSON.stringify(session.conversation));
+        // await saveConversationToExel(from, JSON.stringify(session.conversation));
         delete userSessions[from];
     }
 
     console.log(`User: ${from}, Message: ${incomingMsg}, Step: ${session.step}`);
     res.status(200).end();
+
+    releaseLock(from);
+    
 });
+
+
 
 app.get("/conversation/:userId", async (req, res) => {
     const userId = req.params.userId;
