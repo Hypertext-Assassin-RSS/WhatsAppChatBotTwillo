@@ -31,6 +31,7 @@ jobs:
           echo "MOODLE_TOKEN: ${{ secrets.MOODLE_TOKEN }}"
           echo "CONNECTION_STRING: ${{ secrets.CONNECTION_STRING }}"
           echo "PORT: ${{ secrets.PORT }}"
+          echo "PORT: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}"
 
       # Remove existing Docker container and image on server
       - name: Remove existing Docker container and image on server
@@ -60,6 +61,7 @@ jobs:
           --build-arg MOODLE_TOKEN=${{ secrets.MOODLE_TOKEN }} \
           --build-arg CONNECTION_STRING=${{ secrets.CONNECTION_STRING }} \
           --build-arg PORT=${{ secrets.PORT }}
+          --build-arg GOOGLE_APPLICATION_CREDENTIALS=${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
 
       # Tag the Docker image
       - name: Tag the Docker image
