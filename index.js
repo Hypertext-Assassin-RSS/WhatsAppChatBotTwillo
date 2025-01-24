@@ -316,12 +316,8 @@ app.post("/whatsapp-webhook", async (req, res) => {
     let enrollment;
     let groupEnrollment;
 
-    console.log(req.body);
     
-
-    let trimmedMsg = req.body?.trim();
-
-    const incomingMsg = trimmedMsg.replace(/[^a-zA-Z0-9]/g, '');
+    const incomingMsg = req.body.Body.replace(/[^a-zA-Z0-9]/g, '');
 
     console.log("Incoming message:", incomingMsg);
 
