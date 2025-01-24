@@ -9,7 +9,8 @@ const { GoogleAuth } = require('google-auth-library');
 
 
 const app = express();
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 require("dotenv").config();
 
@@ -317,7 +318,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
     let groupEnrollment;
 
     
-    const incomingMsg = req.body.Body.replace(/[^a-zA-Z0-9]/g, '');
+    const incomingMsg = req.body?.Body?.replace(/[^a-zA-Z0-9]/g, '')
 
     console.log("Incoming message:", incomingMsg);
 
