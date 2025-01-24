@@ -25,6 +25,7 @@ const pool = new Pool({
 });
 
 const auth = new GoogleAuth({
+    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
 
