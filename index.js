@@ -25,7 +25,6 @@ const pool = new Pool({
 });
 
 const auth = new GoogleAuth({
-    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
 
@@ -317,7 +316,10 @@ app.post("/whatsapp-webhook", async (req, res) => {
     let enrollment;
     let groupEnrollment;
 
-    let trimmedMsg = req.body?.Body?.trim();
+    console.log(req.body);
+    
+
+    let trimmedMsg = req.body?.trim();
 
     const incomingMsg = trimmedMsg.replace(/[^a-zA-Z0-9]/g, '');
 
@@ -479,8 +481,6 @@ app.post("/whatsapp-webhook", async (req, res) => {
     releaseLock(from);
     
 });
-
-
 
 app.get("/conversation/:userId", async (req, res) => {
     const userId = req.params.userId;
