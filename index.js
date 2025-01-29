@@ -9,7 +9,8 @@ const { GoogleAuth } = require('google-auth-library');
 
 
 const app = express();
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 require("dotenv").config();
 
@@ -25,7 +26,6 @@ const pool = new Pool({
 });
 
 const auth = new GoogleAuth({
-    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
     scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
 
@@ -317,9 +317,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
     let enrollment;
     let groupEnrollment;
 
-    let trimmedMsg = req.body?.Body?.trim();
-
-    const incomingMsg = trimmedMsg.replace(/[^a-zA-Z0-9]/g, '');
+    const incomingMsg = req.body?.Body?.replace(/[^a-zA-Z0-9]/g, '')
 
     console.log("Incoming message:", incomingMsg);
 
@@ -421,7 +419,11 @@ app.post("/whatsapp-webhook", async (req, res) => {
                         try {
                             let  status = await enrollUserToMoodleCourse(userId, courseID);
                             console.log('User enrolled in course:', status);
-                            responseMessage = `ඔබගේ ලියාපදිංචිය සාර්ථකයි!\nඔබ අපගේ "${session.courseName}" පාඨමාලාවට සම්බන්ධ  වි ඇත.\n ඇතුල්විම සඳහා ඔබ අප හා සම්බන්ධ වූ '${session.username}'  දුරකථන අංකය username හා password ලෙස භාවිත කරන්න \nDownload the app here: https://shorturl.at/hKmI8.`;
+                            responseMessage = `ඔබගේ ලියාපදිංචිය සාර්ථකයි!\nඔබ අපගේ "${session.courseName}" පාඨමාලාවට සම්බන්ධ  වි ඇත.
+                            \n ඇතුල්විම සඳහා ඔබ අප හා සම්බන්ධ වූ '${session.username}'  දුරකථන අංකය username හා password ලෙස භාවිත කරන්න 
+                            \Download the app here: https://shorturl.at/hKmI8. 
+                            \nඔබට අපගේ App එක Download කරගැනීමට නොහැකිනම් හෝ ඔබ Apple දුරකථනයක් භාවිතා කරන්නේ නම් https://samanalaeschool.lk/ හරහා අප හා සම්බන්ද විය හැක.
+`;
                             // responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
 
                              const delayedMessage = `මෙම e පාසලෙන් ලැබෙන සියලු දැනුම ලබා ගැනීමට ඔබ තවමත් "${session.courseName}" මිල දී ගෙන නැති නම් දැන්ම ඔබගේ ළඟම ඇති අලෙවි නියොජිතගෙන් හෝ පොත් හලෙන්  මිල දී ගන්න නැතහොත් \n  විස්තර දැනගැනීම සඳහා 📞 0768288636 , \n තාක්ෂණික සහය සඳහා 📞0760991306 අමතන්න.`;
@@ -479,8 +481,6 @@ app.post("/whatsapp-webhook", async (req, res) => {
     releaseLock(from);
     
 });
-
-
 
 app.get("/conversation/:userId", async (req, res) => {
     const userId = req.params.userId;
