@@ -317,7 +317,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
     let enrollment;
     let groupEnrollment;
 
-    const incomingMsg = req.body?.Body?.replace(/[^a-zA-Z0-9]/g, '')
+    const incomingMsg = req.body?.Body?.replace(/[^a-zA-Z0-9]/g, '');
 
     console.log("Incoming message:", incomingMsg);
 
@@ -332,124 +332,130 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     await acquireLock(from);
 
-    switch (session.step) {
-        case "greeting":
-            if (/^\d{8}$/.test(incomingMsg)) {
-                enrollment = await checkEnrollId(incomingMsg);
-            } else {
-                responseMessage = `ඔබ අතුලත් කල කේතයේ වැරදී කරුනාකර නැවත නිවැරදි කේතය යොදා send කරන්න නැතහොත් \n තාක්ෂණික සහය සඳහා 📞0760991306 \n විස්තර දැනගැනීම සඳහා 📞 0768288636 ,  අමතන්න.`;
-                session.step = "greeting";
-            }
-            groupEnrollment = await checkGroupEnrollId(incomingMsg);
-            const existingUser = await checkUserInMoodle(formatWhatsAppNumber(from));
-
-            if (enrollment?.exists && existingUser) {
-                session.firstName = existingUser.firstname;
-                session.lastName = existingUser.lastname;
-                session.username = existingUser.username;
-
-                courseID = enrollment.course.course_id;
-
-                console.log('LMS Course ID: ', courseID);
-
-                try {
-                    await enrollUserToMoodleCourse(existingUser.id, courseID);
-                    responseMessage = `${session.firstName} ${session.lastName}! ඔබගේ ඇතුලත් වීම සාර්තකයි. \n ඔබ අපගේ "${enrollment.course.course_name}"පාඨමාලාව සම්බන්ඳ වි ඇත.\nඇතුල්විම සඳහා ඔබ අප හා සම්බන්ධ වූ ${session.username} දුරකථන අංකය username හා password ලෙස භාවිත කරන්න.`;
-                } catch (error) {
-                    responseMessage = `කනගාටුයි ඇතුලත් වීමේ කේතය නැවත එවා උත්සාහ කරන්න!`;
-                }
-                session.step = "greeting";
-            } else if (enrollment?.exists && !existingUser) {
-                courseID = enrollment.course.course_id;
-                session.courseName = enrollment.course.course_name;
-                session.grade = enrollment.course.grade;
-
-                responseMessage = `Welcome! සමනල දැනුම ආයතනය ඔබව සාදරයෙන් පිළිගනී 🙏. "${session.courseName}". පාඨමාලාව සඳහා ඔබව ඇතුලත් කරගැනීමට ඔබගේ පළමු නම ( First Name ) ලබාදෙන්න ( ඉංග්‍රීසි අකුරු භාවිත කරන්න ).`;
-                session.step = "getFirstName";
-            } else if (groupEnrollment?.exists) {
-                responseMessage = `Welcome To ${groupEnrollment.course.course_name} Course. Please Use ${groupEnrollment.course.group_link} to join the group.`;
-                session.step = "greeting";
-            } else {
-                responseMessage = `ඔබ අතුලත් කල කේතයේ වැරදී  කරුනාකර නැවත නිවැරදි කේතය යොදා send කරන්න නැතහොත් \n තාක්ෂණික සහය සඳහා 📞0760991306 \n විස්තර දැනගැනීම සඳහා 📞 0768288636 ,  අමතන්න.`;
-                session.step = "greeting";
-            }
-            break;
-        case "getFirstName":
-            session.firstName = incomingMsg;
-            if (incomingMsg.length <= 3 && /^[A-Za-z]+$/.test(incomingMsg)) {
-                responseMessage = "කරුණාකර ඔබගේ පළමු නම ( First Name ) ලබාදෙන්න.";
-                session.step = "getFirstName";
-            } else {
-                responseMessage = `${session.firstName} ඔබගේ වාසගම ( Last Name ) ලබාදෙන්න.`;
-                session.step = "getLastName";
-            }
-            break;
-        case "getLastName":
-            session.username = formatWhatsAppNumber(from);
-            session.password = formatWhatsAppNumber(from);
-            session.lastName = incomingMsg;
-
-            if (incomingMsg.length <= 3 && /^[A-Za-z]+$/.test(incomingMsg)) {
-                responseMessage = "කරුණාකර ඔබගේ ඔබගේ වාසගම ( Last Name ) ලබාදෙන්න.";
-                session.step = "getLastName";
-            } else {
-                responseMessage = `කරුණාකර ඔබගේ තොරතුරු තහවුරු කරගන්න :\nනම: ${session.firstName} ${session.lastName}\nUsername: ${session.username}\nසනාථ කිරීම සඳහා අංක 1 ද , නැවත උත්සාහ කිරිමට අංක 2 , ලබාදෙන්න.`;
-                session.step = "confirmDetails";
-            }
-            break;
-
-        case "confirmDetails":
-            if (incomingMsg.toLowerCase() === '1' && incomingMsg === '1') {
-                const existingUser = await checkUserInMoodle(session.username);
-                if (existingUser) {
-                    responseMessage = "You are already registered.";
+    // Check for initial message '25010003'
+    if (incomingMsg === '25010003') {
+        responseMessage = "ok";
+        session.step = "greeting";
+    } else {
+        switch (session.step) {
+            case "greeting":
+                if (/^\d{8}$/.test(incomingMsg)) {
+                    enrollment = await checkEnrollId(incomingMsg);
                 } else {
-                    const newUser = {
-                        mobileNo: session.username,
-                        firstName: session.firstName,
-                        lastName: session.lastName,
-                        className: "Class X",
-                        grade: session.grade,
-                        phone: session.username,
-                    };
-                    try {
-                        const moodleUser = await syncUserToMoodle(newUser);
-                        const userId = moodleUser.id;
-
-                        try {
-                            let  status = await enrollUserToMoodleCourse(userId, courseID);
-                            console.log('User enrolled in course:', status);
-                            responseMessage = `ඔබගේ ලියාපදිංචිය සාර්ථකයි!\nඔබ අපගේ "${session.courseName}" පාඨමාලාවට සම්බන්ධ  වි ඇත.
-                            \n ඇතුල්විම සඳහා ඔබ අප හා සම්බන්ධ වූ '${session.username}'  දුරකථන අංකය username හා password ලෙස භාවිත කරන්න 
-                            \Download the app here: https://shorturl.at/hKmI8. 
-                            \nඔබට අපගේ App එක Download කරගැනීමට නොහැකිනම් හෝ ඔබ Apple දුරකථනයක් භාවිතා කරන්නේ නම් https://samanalaeschool.lk/ හරහා අප හා සම්බන්ද විය හැක.
-`;
-                            // responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
-
-                             const delayedMessage = `මෙම e පාසලෙන් ලැබෙන සියලු දැනුම ලබා ගැනීමට ඔබ තවමත් "${session.courseName}" මිල දී ගෙන නැති නම් දැන්ම ඔබගේ ළඟම ඇති අලෙවි නියොජිතගෙන් හෝ පොත් හලෙන්  මිල දී ගන්න නැතහොත් \n  විස්තර දැනගැනීම සඳහා 📞 0768288636 , \n තාක්ෂණික සහය සඳහා 📞0760991306 අමතන්න.`;
-                             sendDelayedMessage(from, delayedMessage, 10 * 1000);
- 
-                        } catch (error) {
-                            responseMessage = `Registration successful!`;
-                        }
-                    } catch (error) {
-                        responseMessage = "An error occurred during registration. Please try again.";
-                    }
+                    responseMessage = `ඔබ අතුලත් කල කේතයේ වැරදී කරුනාකර නැවත නිවැරදි කේතය යොදා send කරන්න නැතහොත් \n තාක්ෂණික සහය සඳහා 📞0760991306 \n විස්තර දැනගැනීම සඳහා 📞 0768288636 ,  අමතන්න.`;
+                    session.step = "greeting";
                 }
-                session.step = "greeting";
-            } else if (incomingMsg.toLowerCase() === '2' && incomingMsg === '2') {
-                responseMessage = "නැවත උත්සහ කරමු. ඔබගේ පළමු නම ( First Name ) ලබාදෙන්න.";
-                session.step = "getFirstName";
-            } else {
-                responseMessage = `ලබාදුන් පිළිතුර වැරදි නැවත උත්සහ කරන්න. \nකරුණාකර ඔබගේ තොරතුරු තහවුරු කරගන්න :\nනම: ${session.firstName} ${session.lastName}\nUsername: ${session.username}\nසනාථ් කිරීම සඳහා අංක 1 ද , නැවත උත්සාහ කිරිමට අංක 2 , ලබාදෙන්න.`;
-                session.step = "confirmDetails";
-            }
-            break;
+                groupEnrollment = await checkGroupEnrollId(incomingMsg);
+                const existingUser = await checkUserInMoodle(formatWhatsAppNumber(from));
 
-        default:
-            responseMessage = "An error occurred. Please start again.";
-            session.step = "greeting";
-            break;
+                if (enrollment?.exists && existingUser) {
+                    session.firstName = existingUser.firstname;
+                    session.lastName = existingUser.lastname;
+                    session.username = existingUser.username;
+
+                    courseID = enrollment.course.course_id;
+
+                    console.log('LMS Course ID: ', courseID);
+
+                    try {
+                        await enrollUserToMoodleCourse(existingUser.id, courseID);
+                        responseMessage = `${session.firstName} ${session.lastName}! ඔබගේ ඇතුලත් වීම සාර්තකයි. \n ඔබ අපගේ "${enrollment.course.course_name}"පාඨමාලාව සම්බන්ඳ වි ඇත.\nඇතුල්විම සඳහා ඔබ අප හා සම්බන්ධ වූ ${session.username} දුරකථන අංකය username හා password ලෙස භාවිත කරන්න.`;
+                    } catch (error) {
+                        responseMessage = `කනගාටුයි ඇතුලත් වීමේ කේතය නැවත එවා උත්සාහ කරන්න!`;
+                    }
+                    session.step = "greeting";
+                } else if (enrollment?.exists && !existingUser) {
+                    courseID = enrollment.course.course_id;
+                    session.courseName = enrollment.course.course_name;
+                    session.grade = enrollment.course.grade;
+
+                    responseMessage = `Welcome! සමනල දැනුම ආයතනය ඔබව සාදරයෙන් පිළිගනී 🙏. "${session.courseName}". පාඨමාලාව සඳහා ඔබව ඇතුලත් කරගැනීමට ඔබගේ පළමු නම ( First Name ) ලබාදෙන්න ( ඉංග්‍රීසි අකුරු භාවිත කරන්න ).`;
+                    session.step = "getFirstName";
+                } else if (groupEnrollment?.exists) {
+                    responseMessage = `Welcome To ${groupEnrollment.course.course_name} Course. Please Use ${groupEnrollment.course.group_link} to join the group.`;
+                    session.step = "greeting";
+                } else {
+                    responseMessage = `ඔබ අතුලත් කල කේතයේ වැරදී  කරුනාකර නැවත නිවැරදි කේතය යොදා send කරන්න නැතහොත් \n තාක්ෂණික සහය සඳහා 📞0760991306 \n විස්තර දැනගැනීම සඳහා 📞 0768288636 ,  අමතන්න.`;
+                    session.step = "greeting";
+                }
+                break;
+            case "getFirstName":
+                session.firstName = incomingMsg;
+                if (incomingMsg.length <= 3 && /^[A-Za-z]+$/.test(incomingMsg)) {
+                    responseMessage = "කරුණාකර ඔබගේ පළමු නම ( First Name ) ලබාදෙන්න.";
+                    session.step = "getFirstName";
+                } else {
+                    responseMessage = `${session.firstName} ඔබගේ වාසගම ( Last Name ) ලබාදෙන්න.`;
+                    session.step = "getLastName";
+                }
+                break;
+            case "getLastName":
+                session.username = formatWhatsAppNumber(from);
+                session.password = formatWhatsAppNumber(from);
+                session.lastName = incomingMsg;
+
+                if (incomingMsg.length <= 3 && /^[A-Za-z]+$/.test(incomingMsg)) {
+                    responseMessage = "කරුණාකර ඔබගේ ඔබගේ වාසගම ( Last Name ) ලබාදෙන්න.";
+                    session.step = "getLastName";
+                } else {
+                    responseMessage = `කරුණාකර ඔබගේ තොරතුරු තහවුරු කරගන්න :\nනම: ${session.firstName} ${session.lastName}\nUsername: ${session.username}\nසනාථ කිරීම සඳහා අංක 1 ද , නැවත උත්සාහ කිරිමට අංක 2 , ලබාදෙන්න.`;
+                    session.step = "confirmDetails";
+                }
+                break;
+
+            case "confirmDetails":
+                if (incomingMsg.toLowerCase() === '1' && incomingMsg === '1') {
+                    const existingUser = await checkUserInMoodle(session.username);
+                    if (existingUser) {
+                        responseMessage = "You are already registered.";
+                    } else {
+                        const newUser = {
+                            mobileNo: session.username,
+                            firstName: session.firstName,
+                            lastName: session.lastName,
+                            className: "Class X",
+                            grade: session.grade,
+                            phone: session.username,
+                        };
+                        try {
+                            const moodleUser = await syncUserToMoodle(newUser);
+                            const userId = moodleUser.id;
+
+                            try {
+                                let status = await enrollUserToMoodleCourse(userId, courseID);
+                                console.log('User enrolled in course:', status);
+                                responseMessage = `ඔබගේ ලියාපදිංචිය සාර්ථකයි!\nඔබ අපගේ "${session.courseName}" පාඨමාලාවට සම්බන්ධ  වි ඇත.
+                                \n ඇතුල්විම සඳහා ඔබ අප හා සම්බන්ධ වූ '${session.username}'  දුරකථන අංකය username හා password ලෙස භාවිත කරන්න 
+                                \Download the app here: https://shorturl.at/hKmI8. 
+                                \nඔබට අපගේ App එක Download කරගැනීමට නොහැකිනම් හෝ ඔබ Apple දුරකථනයක් භාවිතා කරන්නේ නම් https://samanalaeschool.lk/ හරහා අප හා සම්බන්ද විය හැක.
+    `;
+                                // responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
+
+                                const delayedMessage = `මෙම e පාසලෙන් ලැබෙන සියලු දැනුම ලබා ගැනීමට ඔබ තවමත් "${session.courseName}" මිල දී ගෙන නැති නම් දැන්ම ඔබගේ ළඟම ඇති අලෙවි නියොජිතගෙන් හෝ පොත් හලෙන්  මිල දී ගන්න නැතහොත් \n  විස්තර දැනගැනීම සඳහා 📞 0768288636 , \n තාක්ෂණික සහය සඳහා 📞0760991306 අමතන්න.`;
+                                sendDelayedMessage(from, delayedMessage, 10 * 1000);
+
+                            } catch (error) {
+                                responseMessage = `Registration successful!`;
+                            }
+                        } catch (error) {
+                            responseMessage = "An error occurred during registration. Please try again.";
+                        }
+                    }
+                    session.step = "greeting";
+                } else if (incomingMsg.toLowerCase() === '2' && incomingMsg === '2') {
+                    responseMessage = "නැවත උත්සහ කරමු. ඔබගේ පළමු නම ( First Name ) ලබාදෙන්න.";
+                    session.step = "getFirstName";
+                } else {
+                    responseMessage = `ලබාදුන් පිළිතුර වැරදි නැවත උත්සහ කරන්න. \nකරුණාකර ඔබගේ තොරතුරු තහවුරු කරගන්න :\nනම: ${session.firstName} ${session.lastName}\nUsername: ${session.username}\nසනාථ් කිරීම සඳහා අංක 1 ද , නැවත උත්සාහ කිරිමට අංක 2 , ලබාදෙන්න.`;
+                    session.step = "confirmDetails";
+                }
+                break;
+
+            default:
+                responseMessage = "An error occurred. Please start again.";
+                session.step = "greeting";
+                break;
+        }
     }
 
     session.conversation.push({ direction: 'outgoing', message: responseMessage });
@@ -479,7 +485,6 @@ app.post("/whatsapp-webhook", async (req, res) => {
     res.status(200).end();
 
     releaseLock(from);
-    
 });
 
 app.get("/conversation/:userId", async (req, res) => {
