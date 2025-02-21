@@ -162,7 +162,6 @@ function getUserSession(from) {
     return userSessions[from];
 }
 
-// Helper function to add timeout
 function withTimeout(promise, timeoutMs) {
     return Promise.race([
         promise,
@@ -230,7 +229,7 @@ const syncUserToMoodle = async (user) => {
         params.append('users[0][customfields][2][type]', 'Phone');
         params.append('users[0][customfields][2][value]', user.phone);
         params.append('users[0][customfields][3][type]', 'Grade');
-        params.append('users[0][customfields][3][value]', 'Grade ' + user.grade);
+        params.append('users[0][customfields][3][value]', user.grade);
 
         params.append('users[0][auth]', 'manual');
 
@@ -332,10 +331,44 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     await acquireLock(from);
 
-    // Check for initial message '25010003'
+    const existingUser = await checkUserInMoodle(formatWhatsAppNumber(from));
+
     if (incomingMsg === '25010003') {
-        responseMessage = "ok";
-        session.step = "greeting";
+        if (existingUser) {
+            console.log('User exists in Moodle:', existingUser.username);
+            console.log('User custom fields:', existingUser.customfields[1].value);
+
+            const userGrade = existingUser.customfields[1].value.charAt(existingUser.customfields[1].value.length - 1);
+
+            switch (userGrade) {
+                case '3':
+                    await enrollUserToMoodleCourse(existingUser.id, 5);
+                    await enrollUserToMoodleCourse(existingUser.id, 3);
+                    responseMessage = `ඔබ අපගේ 2025 eපාසල Smart-03 ජනවාරි සහ පෙබරවාරි පාඨමාලාව සම්බන්ධ වි ඇත. \nඔබගේ username = ${existingUser.username} \npassword = ${existingUser.username} ලෙස භාවිත කරන්න.`;
+                    session.step = "greeting";
+                    break;
+                case '4':
+                    await enrollUserToMoodleCourse(existingUser.id, 5);
+                    await enrollUserToMoodleCourse(existingUser.id, 4);
+                    responseMessage = `ඔබ අපගේ 2025 eපාසල Smart-04 ජනවාරි සහ පෙබරවාරි පාඨමාලාව සම්බන්ධ වි ඇත. \nඔබගේ username = ${existingUser.username} \npassword = ${existingUser.username} ලෙස භාවිත කරන්න.`;
+                    session.step = "greeting";
+                    break;
+                case '5':
+                    await enrollUserToMoodleCourse(existingUser.id, 72);
+                    await enrollUserToMoodleCourse(existingUser.id, 68);
+                    responseMessage = `ඔබ අපගේ 2025 eපාසල Smart-05 ජනවාරි සහ පෙබරවාරි පාඨමාලාව සම්බන්ධ වි ඇත. \nඔබගේ username = ${existingUser.username} \npassword = ${existingUser.username} ලෙස භාවිත කරන්න.`;
+                    session.step = "greeting";
+                    break;
+                default:
+                    responseMessage = `ඔබ අතුලත් කල කේතයේ වැරදී කරුනාකර නැවත නිවැරදි කේතය යොදා send කරන්න නැතහොත් \n තාක්ෂණික සහය සඳහා 📞0760991306 \n විස්තර දැනගැනීම සඳහා 📞 0768288636 ,  අමතන්න.`;
+                    session.step = "greeting";
+                    break;
+            }
+
+        } else {
+            responseMessage = "User not found. Please contact support.";
+            session.step = "greeting";
+        }
     } else {
         switch (session.step) {
             case "greeting":
@@ -346,8 +379,6 @@ app.post("/whatsapp-webhook", async (req, res) => {
                     session.step = "greeting";
                 }
                 groupEnrollment = await checkGroupEnrollId(incomingMsg);
-                const existingUser = await checkUserInMoodle(formatWhatsAppNumber(from));
-
                 if (enrollment?.exists && existingUser) {
                     session.firstName = existingUser.firstname;
                     session.lastName = existingUser.lastname;
@@ -375,7 +406,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
                     responseMessage = `Welcome To ${groupEnrollment.course.course_name} Course. Please Use ${groupEnrollment.course.group_link} to join the group.`;
                     session.step = "greeting";
                 } else {
-                    responseMessage = `ඔබ අතුලත් කල කේතයේ වැරදී  කරුනාකර නැවත නිවැරදි කේතය යොදා send කරන්න නැතහොත් \n තාක්ෂණික සහය සඳහා 📞0760991306 \n විස්තර දැනගැනීම සඳහා 📞 0768288636 ,  අමතන්න.`;
+                    responseMessage = `ඔබ අතුලත් කල කේතයේ වැරදී කරුනාකර නැවත නිවැරදි කේතය යොදා send කරන්න නැතහොත් \n තාක්ෂණික සහය සඳහා 📞0760991306 \n විස්තර දැනගැනීම සඳහා 📞 0768288636 ,  අමතන්න.`;
                     session.step = "greeting";
                 }
                 break;
