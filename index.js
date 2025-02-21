@@ -337,8 +337,8 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     if (incomingMsg === '25010003') {
         if (existingUser) {
-            console.log('User exists in Moodle:', existingUser.username);
-            console.log('User custom fields:', existingUser.customfields[1].value);
+            console.log('User exists in Moodle:', existingUser?.username);
+            console.log('User custom fields:', existingUser?.customfields[1].value);
 
             const userGrade = existingUser.customfields[1].value.charAt(existingUser.customfields[1].value.length - 1);
 
@@ -347,35 +347,41 @@ app.post("/whatsapp-webhook", async (req, res) => {
                     await enrollUserToMoodleCourse(existingUser.id, 5);
                     await enrollUserToMoodleCourse(existingUser.id, 3);
                     responseMessage = `ඔබ අපගේ 2025 eපාසල Smart-03 ජනවාරි සහ පෙබරවාරි පාඨමාලාව සම්බන්ධ වි ඇත. \nඔබගේ username = ${existingUser.username} \npassword = ${existingUser.username} ලෙස භාවිත කරන්න.`;
-            
                     break;
                 case '4':
-                    await enrollUserToMoodleCourse(existingUser.id, 5);
+                    await enrollUserToMoodleCourse(existingUser.id, 8);
                     await enrollUserToMoodleCourse(existingUser.id, 4);
                     responseMessage = `ඔබ අපගේ 2025 eපාසල Smart-04 ජනවාරි සහ පෙබරවාරි පාඨමාලාව සම්බන්ධ වි ඇත. \nඔබගේ username = ${existingUser.username} \npassword = ${existingUser.username} ලෙස භාවිත කරන්න.`;
-                    
                     break;
                 case '5':
                     await enrollUserToMoodleCourse(existingUser.id, 72);
                     await enrollUserToMoodleCourse(existingUser.id, 68);
                     responseMessage = `ඔබ අපගේ 2025 eපාසල Smart-05 ජනවාරි සහ පෙබරවාරි පාඨමාලාව සම්බන්ධ වි ඇත. \nඔබගේ username = ${existingUser.username} \npassword = ${existingUser.username} ලෙස භාවිත කරන්න.`;
-                    
                     break;
                 default:
                     responseMessage = `ඔබ අතුලත් කල කේතයේ වැරදී කරුනාකර නැවත නිවැරදි කේතය යොදා send කරන්න නැතහොත් \n තාක්ෂණික සහය සඳහා 📞0760991306 \n විස්තර දැනගැනීම සඳහා 📞 0768288636 ,  අමතන්න.`;
-                    
                     break;
             }
 
             session.step = "greeting";
 
         } else {
-            responseMessage = "කරුනාකර ඔබගේ ශ්‍රේණිය ඇතුලත් කරන්න \n උදා :- 4 ශ්‍රේණිය නම් අංක 4 අතුලත් කර send කරන්න.";
-            session.grade = `Grade ` + (parseInt(incomingMsg));
-            
+            responseMessage = "කරුනා කර ඔබගේ ශ්‍රේණිය අතුලත් කරන්න, උදා :- 4  ශ්‍රේණිය  නම් අංක 4 යොදා send කරන්න";
+            session.step = "getGrade";
         }
     } else {
         switch (session.step) {
+            case "getGrade":
+                const grade = parseInt(incomingMsg);
+                if (!isNaN(grade) && grade >= 3 && grade <= 5) {
+                    session.grade = grade;
+                    responseMessage = `Welcome! සමනල දැනුම ආයතනය ඔබව සාදරයෙන් පිළිගනී 🙏. \nපාඨමාලාව සඳහා ඔබව ඇතුලත් කරගැනීමට ඔබගේ පළමු නම ( First Name ) ලබාදෙන්න ( ඉංග්‍රීසි අකුරු භාවිත කරන්න ).`;
+                    session.step = "getFirstName";
+                } else {
+                    responseMessage = "කරුනා කර ඔබගේ ශ්‍රේණිය අතුලත් කරන්න, උදා :- 4  ශ්‍රේණිය  නම් අංක 4 යොදා send කරන්න";
+                    session.step = "getGrade";
+                }
+                break;
             case "greeting":
                 if (/^\d{8}$/.test(incomingMsg)) {
                     enrollment = await checkEnrollId(incomingMsg);
@@ -441,41 +447,47 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
             case "confirmDetails":
                 if (incomingMsg.toLowerCase() === '1' && incomingMsg === '1') {
-                    const existingUser = await checkUserInMoodle(session.username);
-                    if (existingUser) {
-                        responseMessage = "You are already registered.";
-                    } else {
-                        const newUser = {
-                            mobileNo: session.username,
-                            firstName: session.firstName,
-                            lastName: session.lastName,
-                            className: "Class X",
-                            grade: session.grade,
-                            phone: session.username,
-                        };
+                    const newUser = {
+                        mobileNo: session.username,
+                        firstName: session.firstName,
+                        lastName: session.lastName,
+                        className: "Class X",
+                        grade: session.grade,
+                        phone: session.username,
+                    };
+                    try {
+                        const moodleUser = await syncUserToMoodle(newUser);
+                        const userId = moodleUser.id;
+
                         try {
-                            const moodleUser = await syncUserToMoodle(newUser);
-                            const userId = moodleUser.id;
-
-                            try {
-                                let status = await enrollUserToMoodleCourse(userId, courseID);
-                                console.log('User enrolled in course:', status);
-                                responseMessage = `ඔබගේ ලියාපදිංචිය සාර්ථකයි!\nඔබ අපගේ "${session.courseName}" පාඨමාලාවට සම්බන්ධ  වි ඇත.
-                                \n ඇතුල්විම සඳහා ඔබ අප හා සම්බන්ධ වූ '${session.username}'  දුරකථන අංකය username හා password ලෙස භාවිත කරන්න 
-                                \Download the app here: https://shorturl.at/hKmI8. 
-                                \nඔබට අපගේ App එක Download කරගැනීමට නොහැකිනම් හෝ ඔබ Apple දුරකථනයක් භාවිතා කරන්නේ නම් https://samanalaeschool.lk/ හරහා අප හා සම්බන්ද විය හැක.
-    `;
-                                // responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
-
-                                const delayedMessage = `මෙම e පාසලෙන් ලැබෙන සියලු දැනුම ලබා ගැනීමට ඔබ තවමත් "${session.courseName}" මිල දී ගෙන නැති නම් දැන්ම ඔබගේ ළඟම ඇති අලෙවි නියොජිතගෙන් හෝ පොත් හලෙන්  මිල දී ගන්න නැතහොත් \n  විස්තර දැනගැනීම සඳහා 📞 0768288636 , \n තාක්ෂණික සහය සඳහා 📞0760991306 අමතන්න.`;
-                                sendDelayedMessage(from, delayedMessage, 10 * 1000);
-
-                            } catch (error) {
-                                responseMessage = `Registration successful!`;
+                            let status1, status2;
+                            if (session.grade == 3) {
+                                status1 = await enrollUserToMoodleCourse(userId, 5);
+                                status2 = await enrollUserToMoodleCourse(userId, 3);
+                            } else if (session.grade == 4) {
+                                status1 = await enrollUserToMoodleCourse(userId, 8);
+                                status2 = await enrollUserToMoodleCourse(userId, 4);
+                            } else if (session.grade == 5) {
+                                status1 = await enrollUserToMoodleCourse(userId, 72);
+                                status2 = await enrollUserToMoodleCourse(userId, 68);
                             }
+
+                            console.log('User enrolled in courses:', status1, status2);
+                            responseMessage = `ඔබගේ ලියාපදිංචිය සාර්ථකයි!\nඔබ අපගේ 2025 eපාසල Smart-${session.grade} ජනවාරි සහ පෙබරවාරි පාඨමාලාවට සම්බන්ධ  වි ඇත.
+                            \n ඇතුල්විම සඳහා ඔබ අප හා සම්බන්ධ වූ '${session.username}'  දුරකථන අංකය username හා password ලෙස භාවිත කරන්න 
+                            \Download the app here: https://shorturl.at/hKmI8. 
+                            \nඔබට අපගේ App එක Download කරගැනීමට නොහැකිනම් හෝ ඔබ Apple දුරකථනයක් භාවිතා කරන්නේ නම් https://samanalaeschool.lk/ හරහා අප හා සම්බන්ද විය හැක.
+    `;
+                            // responseMedia = ["https://bucket-ebooks.s3.us-east-1.amazonaws.com/whatsapp-bot/WhatsApp%20Image%202024-11-29%20at%2016.06.50_8f4cf944.jpg"];
+
+                            const delayedMessage = `මෙම e පාසලෙන් ලැබෙන සියලු දැනුම ලබා ගැනීමට ඔබ තවමත් "${session.courseName}" මිල දී ගෙන නැති නම් දැන්ම ඔබගේ ළඟම ඇති අලෙවි නියොජිතගෙන් හෝ පොත් හලෙන්  මිල දී ගන්න නැතහොත් \n විස්තර දැනගැනීම සඳහා 📞 0768288636 , \n තාක්ෂණික සහය සඳහා 📞0760991306 අමතන්න.`;
+                            sendDelayedMessage(from, delayedMessage, 10 * 1000);
+
                         } catch (error) {
-                            responseMessage = "An error occurred during registration. Please try again.";
+                            responseMessage = `Registration successful!`;
                         }
+                    } catch (error) {
+                        responseMessage = "An error occurred during registration. Please try again.";
                     }
                     session.step = "greeting";
                 } else if (incomingMsg.toLowerCase() === '2' && incomingMsg === '2') {
