@@ -18,6 +18,8 @@ const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const client = twilio(accountSid, authToken);
 let courseID;
+let courseID1;
+let courseID2;
 
 const userSessions = {};
 
@@ -345,29 +347,32 @@ app.post("/whatsapp-webhook", async (req, res) => {
                     await enrollUserToMoodleCourse(existingUser.id, 5);
                     await enrollUserToMoodleCourse(existingUser.id, 3);
                     responseMessage = `ඔබ අපගේ 2025 eපාසල Smart-03 ජනවාරි සහ පෙබරවාරි පාඨමාලාව සම්බන්ධ වි ඇත. \nඔබගේ username = ${existingUser.username} \npassword = ${existingUser.username} ලෙස භාවිත කරන්න.`;
-                    session.step = "greeting";
+            
                     break;
                 case '4':
                     await enrollUserToMoodleCourse(existingUser.id, 5);
                     await enrollUserToMoodleCourse(existingUser.id, 4);
                     responseMessage = `ඔබ අපගේ 2025 eපාසල Smart-04 ජනවාරි සහ පෙබරවාරි පාඨමාලාව සම්බන්ධ වි ඇත. \nඔබගේ username = ${existingUser.username} \npassword = ${existingUser.username} ලෙස භාවිත කරන්න.`;
-                    session.step = "greeting";
+                    
                     break;
                 case '5':
                     await enrollUserToMoodleCourse(existingUser.id, 72);
                     await enrollUserToMoodleCourse(existingUser.id, 68);
                     responseMessage = `ඔබ අපගේ 2025 eපාසල Smart-05 ජනවාරි සහ පෙබරවාරි පාඨමාලාව සම්බන්ධ වි ඇත. \nඔබගේ username = ${existingUser.username} \npassword = ${existingUser.username} ලෙස භාවිත කරන්න.`;
-                    session.step = "greeting";
+                    
                     break;
                 default:
                     responseMessage = `ඔබ අතුලත් කල කේතයේ වැරදී කරුනාකර නැවත නිවැරදි කේතය යොදා send කරන්න නැතහොත් \n තාක්ෂණික සහය සඳහා 📞0760991306 \n විස්තර දැනගැනීම සඳහා 📞 0768288636 ,  අමතන්න.`;
-                    session.step = "greeting";
+                    
                     break;
             }
 
-        } else {
-            responseMessage = "User not found. Please contact support.";
             session.step = "greeting";
+
+        } else {
+            responseMessage = "කරුනාකර ඔබගේ ශ්‍රේණිය ඇතුලත් කරන්න \n උදා :- 4 ශ්‍රේණිය නම් අංක 4 අතුලත් කර send කරන්න.";
+            session.grade = `Grade ` + (parseInt(incomingMsg));
+            
         }
     } else {
         switch (session.step) {
