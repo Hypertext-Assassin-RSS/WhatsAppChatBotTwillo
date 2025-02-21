@@ -18,8 +18,7 @@ const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const client = twilio(accountSid, authToken);
 let courseID;
-let courseID1;
-let courseID2;
+
 
 const userSessions = {};
 
@@ -45,28 +44,6 @@ const RANGE = 'Sheet1!A:I';
     }
 })();
 
-const checkEnrollId = async (enrollId) => {
-    console.log('Checking enroll_id:', enrollId);
-
-    try {
-        const query = `
-            SELECT * FROM public.moodle_courses WHERE enroll_id = $1;
-        `;
-        const values = [enrollId];
-        const result = await pool.query(query, values);
-
-        if (result.rows.length > 0) {
-            console.log('Enroll_id exists:', enrollId);
-            return { exists: true, course: result.rows[0] };
-        } else {
-            console.log('Enroll_id does not exist:', enrollId);
-            return { exists: false };
-        }
-    } catch (err) {
-        console.error("Error checking enroll_id:", err);
-        throw err;
-    }
-};
 
 const checkGroupEnrollId = async (enrollId) => {
     console.log('Checking group enroll_id:', enrollId);
@@ -313,7 +290,37 @@ const releaseLock = (from) => {
 };
 
 
-// WhatsApp webhook
+const checkEnrollId = async (enrollId) => {
+    console.log('Checking enroll_id:', enrollId);
+
+    try {
+        const query = `
+            SELECT * FROM public.moodle_courses WHERE enroll_id = $1;
+        `;
+        const values = [enrollId];
+        const result = await pool.query(query, values);
+
+        if (result.rows.length > 0) {
+            console.log('Enroll_id exists:', enrollId);
+            const course = result.rows[0];
+            let courseIds = [course.course_id];
+
+            if (course.course_id.toString().length > 2) {
+                const courseIdStr = course.course_id.toString();
+                courseIds = [parseInt(courseIdStr.slice(0, 2)), parseInt(courseIdStr.slice(2))];
+            }
+
+            return { exists: true, course, courseIds };
+        } else {
+            console.log('Enroll_id does not exist:', enrollId);
+            return { exists: false };
+        }
+    } catch (err) {
+        console.error("Error checking enroll_id:", err);
+        throw err;
+    }
+};
+
 app.post("/whatsapp-webhook", async (req, res) => {
     let enrollment;
     let groupEnrollment;
@@ -337,20 +344,20 @@ app.post("/whatsapp-webhook", async (req, res) => {
 
     if (incomingMsg === '25010003') {
         if (existingUser) {
-            console.log('User exists in Moodle:', existingUser?.username);
-            console.log('User custom fields:', existingUser?.customfields[1].value);
+            console.log('User exists in Moodle:', existingUser.username);
+            console.log('User custom fields:', existingUser.customfields[3].value);
 
-            const userGrade = existingUser.customfields[1].value.charAt(existingUser.customfields[1].value.length - 1);
+            const userGrade = existingUser.customfields[3].value.charAt(existingUser.customfields[3].value.length - 1);
 
             switch (userGrade) {
                 case '3':
-                    await enrollUserToMoodleCourse(existingUser.id, 5);
-                    await enrollUserToMoodleCourse(existingUser.id, 3);
+                    await enrollUserToMoodleCourse(existingUser.id, 62);
+                    await enrollUserToMoodleCourse(existingUser.id, 70);
                     responseMessage = `ඔබ අපගේ 2025 eපාසල Smart-03 ජනවාරි සහ පෙබරවාරි පාඨමාලාව සම්බන්ධ වි ඇත. \nඔබගේ username = ${existingUser.username} \npassword = ${existingUser.username} ලෙස භාවිත කරන්න.`;
                     break;
                 case '4':
-                    await enrollUserToMoodleCourse(existingUser.id, 8);
-                    await enrollUserToMoodleCourse(existingUser.id, 4);
+                    await enrollUserToMoodleCourse(existingUser.id, 58);
+                    await enrollUserToMoodleCourse(existingUser.id, 71);
                     responseMessage = `ඔබ අපගේ 2025 eපාසල Smart-04 ජනවාරි සහ පෙබරවාරි පාඨමාලාව සම්බන්ධ වි ඇත. \nඔබගේ username = ${existingUser.username} \npassword = ${existingUser.username} ලෙස භාවිත කරන්න.`;
                     break;
                 case '5':
@@ -366,7 +373,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
             session.step = "greeting";
 
         } else {
-            responseMessage = "කරුනා කර ඔබගේ ශ්‍රේණිය අතුලත් කරන්න, උදා :- 4  ශ්‍රේණිය  නම් අංක 4 යොදා send කරන්න";
+            responseMessage = "කරුනා කර ඔබගේ ශ්‍රේණිය අතුලත් කරන්න, උදා :- 4  ශ්‍රේණිය  නම් අංක 4 යොදා send කරන්න.";
             session.step = "getGrade";
         }
     } else {
@@ -375,7 +382,7 @@ app.post("/whatsapp-webhook", async (req, res) => {
                 const grade = parseInt(incomingMsg);
                 if (!isNaN(grade) && grade >= 3 && grade <= 5) {
                     session.grade = grade;
-                    responseMessage = `Welcome! සමනල දැනුම ආයතනය ඔබව සාදරයෙන් පිළිගනී 🙏. \nපාඨමාලාව සඳහා ඔබව ඇතුලත් කරගැනීමට ඔබගේ පළමු නම ( First Name ) ලබාදෙන්න ( ඉංග්‍රීසි අකුරු භාවිත කරන්න ).`;
+                    responseMessage = "Welcome! සමනල දැනුම ආයතනය ඔබව සාදරයෙන් පිළිගනී 🙏. පාඨමාලාව සඳහා ඔබව ඇතුලත් කරගැනීමට ඔබගේ පළමු නම ( First Name ) ලබාදෙන්න ( ඉංග්‍රීසි අකුරු භාවිත කරන්න ).";
                     session.step = "getFirstName";
                 } else {
                     responseMessage = "කරුනා කර ඔබගේ ශ්‍රේණිය අතුලත් කරන්න, උදා :- 4  ශ්‍රේණිය  නම් අංක 4 යොදා send කරන්න";
@@ -395,21 +402,24 @@ app.post("/whatsapp-webhook", async (req, res) => {
                     session.lastName = existingUser.lastname;
                     session.username = existingUser.username;
 
-                    courseID = enrollment.course.course_id;
+                    const courseIds = enrollment.courseIds;
 
-                    console.log('LMS Course ID: ', courseID);
+                    console.log('LMS Course IDs: ', courseIds);
 
                     try {
-                        await enrollUserToMoodleCourse(existingUser.id, courseID);
+                        for (const courseId of courseIds) {
+                            await enrollUserToMoodleCourse(existingUser.id, courseId);
+                        }
                         responseMessage = `${session.firstName} ${session.lastName}! ඔබගේ ඇතුලත් වීම සාර්තකයි. \n ඔබ අපගේ "${enrollment.course.course_name}"පාඨමාලාව සම්බන්ඳ වි ඇත.\nඇතුල්විම සඳහා ඔබ අප හා සම්බන්ධ වූ ${session.username} දුරකථන අංකය username හා password ලෙස භාවිත කරන්න.`;
                     } catch (error) {
                         responseMessage = `කනගාටුයි ඇතුලත් වීමේ කේතය නැවත එවා උත්සාහ කරන්න!`;
                     }
                     session.step = "greeting";
                 } else if (enrollment?.exists && !existingUser) {
-                    courseID = enrollment.course.course_id;
+                    const courseIds = enrollment.courseIds;
                     session.courseName = enrollment.course.course_name;
                     session.grade = enrollment.course.grade;
+                    session.courseIds = courseIds;
 
                     responseMessage = `Welcome! සමනල දැනුම ආයතනය ඔබව සාදරයෙන් පිළිගනී 🙏. "${session.courseName}". පාඨමාලාව සඳහා ඔබව ඇතුලත් කරගැනීමට ඔබගේ පළමු නම ( First Name ) ලබාදෙන්න ( ඉංග්‍රීසි අකුරු භාවිත කරන්න ).`;
                     session.step = "getFirstName";
@@ -462,11 +472,11 @@ app.post("/whatsapp-webhook", async (req, res) => {
                         try {
                             let status1, status2;
                             if (session.grade == 3) {
-                                status1 = await enrollUserToMoodleCourse(userId, 5);
-                                status2 = await enrollUserToMoodleCourse(userId, 3);
+                                status1 = await enrollUserToMoodleCourse(userId, 62);
+                                status2 = await enrollUserToMoodleCourse(userId, 70);
                             } else if (session.grade == 4) {
-                                status1 = await enrollUserToMoodleCourse(userId, 8);
-                                status2 = await enrollUserToMoodleCourse(userId, 4);
+                                status1 = await enrollUserToMoodleCourse(userId, 58);
+                                status2 = await enrollUserToMoodleCourse(userId, 71);
                             } else if (session.grade == 5) {
                                 status1 = await enrollUserToMoodleCourse(userId, 72);
                                 status2 = await enrollUserToMoodleCourse(userId, 68);
